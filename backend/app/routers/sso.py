@@ -31,6 +31,46 @@ def _safe_logout_redirect(value: str, settings) -> str:
     return "/"
 
 
+@router.post("/auth/sso/backchannel")
+async def sso_backchannel(
+    request: Request,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """回程登出：logout_token 验签后按 sub+sid 精确下线会话。"""
+    from app.oidc import OIDCError, OIDCClient
+
+    settings = request.app.state.settings
+    if not settings.oidc_enabled or not (
+        settings.oidc_issuer
+        and settings.oidc_client_id
+        and settings.oidc_redirect_uri
+    ):
+        raise HTTPException(status_code=400, detail="OIDC 未启用")
+    content_type = request.headers.get("content-type", "")
+    if "json" in content_type:
+        payload = await request.json()
+        token = payload.get("logout_token") if isinstance(payload, dict) else None
+    else:
+        form = await request.form()
+        token = form.get("logout_token")
+    if not token:
+        raise HTTPException(status_code=400, detail="缺少 logout_token")
+    try:
+        claims = OIDCClient(settings).validate_logout_token(token)
+    except OIDCError as exc:
+        raise HTTPException(status_code=401, detail=exc.message)
+    sid = claims.get("sid")
+    sub = claims.get("sub")
+    if not sid:
+        raise HTTPException(status_code=400, detail="缺少 sid")
+    conn.execute(
+        "DELETE FROM sessions WHERE sso_sid = ? AND user_id IN "
+        "(SELECT user_id FROM sso_identities WHERE subject = ?)",
+        (sid, sub),
+    )
+    return {"ok": True}
+
+
 @router.get("/auth/sso/logout")
 def sso_logout(
     request: Request,

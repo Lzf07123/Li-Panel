@@ -161,5 +161,6 @@
 - ✅ Phase C（V21–V30）全部完成：2026-08-21，提交范围 `2d36084`（V21）→ `16d254e`（V30）。
 - ✅ V31（SSO 解绑/换绑）：2026-08-21 完成。`GET /api/sso/status` + `DELETE /api/sso/identity`（本地密码确认、错密 403、未绑定 400、不删本地账号）；个人设置页解绑确认弹窗（密码输入）。pytest 114 passed。
 - ✅ V32（RP 发起登出）：2026-08-21 完成。`GET /auth/sso/logout`：本地会话注销 + IdP `end_session_endpoint` + `id_token_hint`（sessions 新增 `sso_id_token` 列）+ 回跳白名单 `PANEL_SSO_LOGOUT_REDIRECTS`（为空仅站内相对路径）。pytest 117 passed（本地 issuer fixture：仅本地/白名单/IdP 跳转）。
-- ⬜ V33–V40：待执行。
+- ✅ V33（回程登出）：2026-08-21 完成。`POST /auth/sso/backchannel`：logout_token 验签（JWKS、iss/aud/exp/events 事件）+ `sub`+`sid` 精确下线；未知 sid 幂等 200；伪造/缺事件 401。pytest 123 passed（本地 JWKS + RSA 签名 fixture）。
+- ⬜ V34–V40：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

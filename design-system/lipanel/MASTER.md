@@ -92,6 +92,7 @@
 - V30 状态导出 API：`GET /api/health/export?format=csv|json`（仅本人启用检测链接，CSV 含表头）；pytest 110 passed
 - V31 SSO 解绑：`GET /api/sso/status`、`DELETE /api/sso/identity`（本地密码确认、错密 403、未绑定 400、解绑不删本地账号）；个人设置页解绑弹窗；pytest 114 passed
 - V32 RP 发起登出：`GET /auth/sso/logout`（本地注销 + OIDC 发现 `end_session_endpoint` + `id_token_hint` + `post_logout_redirect_uri` 白名单 `PANEL_SSO_LOGOUT_REDIRECTS`）；sessions 新增 `sso_id_token`（ALTER 迁移）；pytest 117 passed
+- V33 回程登出：`POST /auth/sso/backchannel`（JSON/form 双格式；`OIDCClient.validate_logout_token` 验签 + iss/aud/exp/events；按 sessions.sso_sid + sso_identities.subject 精确删除，幂等）；pytest 123 passed
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
