@@ -71,6 +71,7 @@
 2026-08-21 Phase B（V11–V20）实测：
 
 - V11 链接拖拽排序：`PATCH /api/links/order`（提供 id 前置整体重排，重复 400 / 跨用户 404）；面板卡片 HTML5 组内拖拽，跨分组提示「仅同组生效」，保存失败回滚；`npx tsc --noEmit && npx vite build` 通过，pytest 40 passed，Playwright 组内拖拽端到端（PATCH 200 + 顺序持久化）通过
+- V12 分组拖拽排序：`PATCH /api/groups/order`（同 V11 整体重排语义）；管理页分组表拖拽行高亮；pytest 45 passed，Playwright 拖拽 常用→娱乐 后顺序持久化
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

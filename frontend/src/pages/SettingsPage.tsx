@@ -48,6 +48,8 @@ export function SettingsPage() {
   const [error, setError] = useState("");
   const [deleteGroupId, setDeleteGroupId] = useState<number | null>(null);
   const [deleteLinkId, setDeleteLinkId] = useState<number | null>(null);
+  const [groupDragId, setGroupDragId] = useState<number | null>(null);
+  const [groupDragOverId, setGroupDragOverId] = useState<number | null>(null);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
 
@@ -197,6 +199,32 @@ export function SettingsPage() {
     },
     { onError: (err) => setError(err.message) },
   );
+
+  function handleGroupDrop(target: GroupOut) {
+    const sourceId = groupDragId;
+    setGroupDragId(null);
+    setGroupDragOverId(null);
+    if (sourceId === null || sourceId === target.id) return;
+    const ids = groups.map((group) => group.id);
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(target.id);
+    if (from === -1 || to === -1) return;
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setGroups((current) => {
+      const byId = new Map(current.map((group) => [group.id, group]));
+      const ordered = next
+        .map((id) => byId.get(id))
+        .filter((group): group is GroupOut => Boolean(group));
+      const rest = current.filter((group) => !next.includes(group.id));
+      return [...ordered, ...rest];
+    });
+    groupsApi.updateOrder(next).catch(() => {
+      toast.error("分组排序保存失败，已恢复原顺序");
+      void groupsApi.list().then(setGroups).catch(() => undefined);
+    });
+  }
 
   if (!me) return <PageSkeleton title="管理" />;
 
@@ -429,7 +457,30 @@ export function SettingsPage() {
                       </thead>
                       <tbody>
                         {groups.map((group) => (
-                          <tr key={group.id}>
+                          <tr
+                            key={group.id}
+                            draggable
+                            onDragStart={() => setGroupDragId(group.id)}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              if (groupDragId !== group.id) {
+                                setGroupDragOverId(group.id);
+                              }
+                            }}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              handleGroupDrop(group);
+                            }}
+                            onDragEnd={() => {
+                              setGroupDragId(null);
+                              setGroupDragOverId(null);
+                            }}
+                            className={`cursor-grab select-none active:cursor-grabbing ${
+                              groupDragOverId === group.id
+                                ? "bg-primary-soft"
+                                : ""
+                            }`}
+                          >
                             <td className="min-w-36 font-medium">{group.name}</td>
                             <td>
                               <span

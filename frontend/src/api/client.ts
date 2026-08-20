@@ -117,6 +117,11 @@ export const groupsApi = {
     }),
   remove: (id: number) =>
     api<void>(`/api/groups/${id}`, { method: "DELETE" }),
+  updateOrder: (ordered_ids: number[]) =>
+    api<{ ok: boolean }>("/api/groups/order", {
+      method: "PATCH",
+      body: JSON.stringify({ ordered_ids }),
+    }),
 };
 
 export const linksApi = {
