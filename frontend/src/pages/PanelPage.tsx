@@ -121,9 +121,7 @@ export function PanelPage() {
   }, [query, panel]);
 
   const site = panel?.site;
-  const total =
-    (panel?.groups.reduce((sum, group) => sum + group.links.length, 0) ?? 0) +
-    ungrouped.length;
+  const total = flatLinks.length;
 
   const logout = async () => {
     await authApi.logout().catch(() => undefined);
@@ -215,6 +213,33 @@ export function PanelPage() {
               /
             </kbd>
           </div>
+
+          {query.trim() && total === 0 ? (
+            <div className="card mx-auto mb-10 max-w-md p-8 text-center">
+              <p className="text-sm font-medium text-foreground">
+                没有找到匹配的快捷方式
+              </p>
+              <p className="mt-1 text-xs text-muted">用外部搜索引擎继续：</p>
+              <div className="mt-4 flex justify-center gap-2">
+                <a
+                  className="btn btn-ghost h-9 px-4"
+                  href={`https://www.bing.com/search?q=${encodeURIComponent(query.trim())}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Bing 搜索
+                </a>
+                <a
+                  className="btn btn-ghost h-9 px-4"
+                  href={`https://www.google.com/search?q=${encodeURIComponent(query.trim())}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Google 搜索
+                </a>
+              </div>
+            </div>
+          ) : null}
 
           {groups.map((group) =>
             group.links.length === 0 ? null : (
