@@ -15,6 +15,7 @@ from app.routers import audit, auth, backup, groups, links, panel, rss, sessions
 from app.routers import health as health_router
 from app.routers import settings as settings_router
 from app.security import RateLimiter
+from app.version import VERSION
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DIST_CANDIDATES = [
@@ -107,11 +108,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         if request.url.path.startswith(("/api/", "/auth/")):
             response.headers["cache-control"] = "no-store"
+        elif request.url.path.startswith("/assets/"):
+            response.headers["cache-control"] = (
+                "public, max-age=31536000, immutable"
+            )
+        response.headers["x-panel-version"] = VERSION
         return response
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"status": "ok"}
+        return {"status": "ok", "version": VERSION}
 
     app.include_router(setup.router)
     app.include_router(auth.router)

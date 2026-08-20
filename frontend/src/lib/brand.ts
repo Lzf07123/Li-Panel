@@ -19,6 +19,8 @@ export const APP_TAGLINE = envString(
 );
 export const COPYRIGHT_HOLDER = APP_NAME;
 export const DOCUMENT_TITLE = `${APP_NAME} · 快捷方式面板`;
+/** 应用版本（V46）：与 backend/app/version.py、docs/CHANGELOG.md 同步 */
+export const APP_VERSION = envString("VITE_APP_VERSION", "0.1.0");
 
 /** 网站图标：统一使用 WebP 单格式（透明背景，512×512） */
 export const FAVICON_WEBP = "/favicon.webp";
