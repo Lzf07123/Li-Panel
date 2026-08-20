@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.brand_defaults import get_site_settings
 from app.db import get_db
+from app.audit import write_audit
 from app.deps import current_user
 from app.rss import MAX_FEEDS, allowed_url
 
@@ -67,6 +68,7 @@ def site_settings_put(
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="仅管理员可修改站点信息")
     payload = body.model_dump(exclude_unset=True)
+    write_audit(conn, user["id"], "site_settings_update", ",".join(payload.keys()))
     for key, value in payload.items():
         if key == "public_mode":
             value = "true" if value else "false"

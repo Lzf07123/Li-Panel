@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.db import get_db, get_user_by_username
 from app.deps import current_user
+from app.audit import write_audit
 from app.security import create_session, delete_session, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -43,6 +44,7 @@ def login(
         lockout.record_failure(body.username, ip)
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     lockout.record_success(body.username, ip)
+    write_audit(conn, user["id"], "login", body.username)
     token = create_session(conn, user["id"], session_days=settings.session_days)
     response.set_cookie(
         "lipanel_session",
@@ -63,6 +65,11 @@ def logout(
     conn: sqlite3.Connection = Depends(get_db),
 ) -> None:
     if lipanel_session:
+        row = conn.execute(
+            "SELECT user_id FROM sessions WHERE token = ?", (lipanel_session,)
+        ).fetchone()
+        if row is not None:
+            write_audit(conn, row["user_id"], "logout", "")
         delete_session(conn, lipanel_session)
     response.delete_cookie("lipanel_session", path="/")
 

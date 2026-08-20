@@ -109,6 +109,16 @@ CREATE TABLE IF NOT EXISTS site_settings (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id, created_at);
+
+
 CREATE TABLE IF NOT EXISTS link_health (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,

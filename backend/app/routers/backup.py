@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.db import get_db
+from app.audit import write_audit
 from app.deps import current_user
 
 router = APIRouter(prefix="/api/backup", tags=["backup"])
@@ -202,7 +203,9 @@ def import_backup(
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
     data = _validate_backup(payload)
-    return {"imported": _apply_backup(conn, user, data)}
+    result = _apply_backup(conn, user, data)
+    write_audit(conn, user["id"], "backup_import", str(result))
+    return {"imported": result}
 
 
 @router.get("/snapshots")
@@ -280,4 +283,6 @@ def restore_snapshot(
     except (OSError, json.JSONDecodeError):
         raise HTTPException(status_code=400, detail="快照文件损坏")
     payload = _snapshot_to_payload(data, user["id"])
-    return {"restored": _apply_backup(conn, user, payload)}
+    result = _apply_backup(conn, user, payload)
+    write_audit(conn, user["id"], "backup_restore", f"{name} {result}")
+    return {"restored": result}

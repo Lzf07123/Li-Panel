@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from app import oidc
 from app.db import create_user, get_db, get_user_by_username
+from app.audit import write_audit
 from app.deps import current_user
 from app.routers.setup import validate_username
 from app.security import create_session, delete_session, hash_password, new_token, verify_password
@@ -149,6 +150,7 @@ def sso_unbind(
     if not verify_password(body.password, user["password_hash"], user["salt"]):
         raise HTTPException(status_code=403, detail="本地密码错误")
     conn.execute("DELETE FROM sso_identities WHERE id = ?", (row["id"],))
+    write_audit(conn, user["id"], "sso_unbind", user["username"])
     return {"ok": True}
 
 FLOW_MINUTES = 10
@@ -274,6 +276,7 @@ def sso_callback(
             sso_id_token=tokens.get("id_token"),
             session_days=settings.session_days,
         )
+        write_audit(conn, identity["user_id"], "sso_login", subject)
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(
             "lipanel_session",
@@ -382,6 +385,7 @@ def sso_link(
         ),
     )
     conn.execute("UPDATE sso_flows SET consumed = 1 WHERE id = ?", (flow["id"],))
+    write_audit(conn, user_id, f"sso_link_{body.action}", flow["subject"])
     session_token = create_session(
         conn, user_id, sso_sid=flow["sid"], session_days=settings.session_days
     )

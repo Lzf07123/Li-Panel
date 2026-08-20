@@ -97,6 +97,7 @@
 - V35 登录锁定：`LoginLockout`（用户名+IP，`PANEL_LOGIN_MAX_FAILS`/`PANEL_LOGIN_LOCK_MINUTES`，成功重置，未知用户同行为）；登录接口 429；pytest 130 passed
 - V36 角色与权限：site_settings 写接口 admin-only（403），读公开；前端按角色过滤「站点信息」标签页；pytest 133 passed
 - V37 会话管理：`GET /api/sessions`（current 标记）、`DELETE /api/sessions/{id}`（当前拒绝 400、跨用户 404）、`DELETE /api/sessions`（吊销其他）；个人设置页会话卡片；pytest 138 passed
+- V38 审计日志：`audit_logs` 表 + `app/audit.py`（登录/登出/SSO 绑定解绑/备份恢复/站点设置变更，滚动 1000 条）；`GET /api/audit-logs` admin-only；pytest 142 passed
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
