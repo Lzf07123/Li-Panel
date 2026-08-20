@@ -43,6 +43,7 @@
 - 后端：pytest 35 passed（视觉改动不涉及后端，回归通过）
 - 一致性：模板占位符清零；`--lipanel-*` 令牌集合与模板一致；每个 `animation` 均有 `@keyframes`；浅色语义色为 V1.3 AA 调校值
 - 主题：存储键迁移为 `lipanel-theme`，旧 `portal-theme` 仅作一次性回退
+- 容器：重建 `lipanel:local` 并 `docker compose up -d` 后 health 返回 `{"status":"ok"}`，`docker stats` 实测 45.73MiB / CPU 0.23% / 2 进程
 - 视觉对照：四档响应式与对比度建议在浏览器中人工复核
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
