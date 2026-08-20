@@ -1,4 +1,5 @@
 ARG IMAGE_REGISTRY=docker.io/library
+ARG PANEL_PORT=8000
 
 # ---------- 前端构建阶段 ----------
 FROM ${IMAGE_REGISTRY}/node:22-alpine AS frontend
@@ -18,6 +19,7 @@ ENV UV_INDEX_URL=${PIP_INDEX_URL}
 ENV PYTHONUNBUFFERED=1
 ENV MALLOC_ARENA_MAX=2
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PANEL_PORT=${PANEL_PORT}
 
 WORKDIR /app
 
@@ -41,9 +43,9 @@ RUN useradd --uid 10001 --create-home appuser && \
     chown -R appuser:appuser /app/data
 
 USER appuser
-EXPOSE 8000
+EXPOSE ${PANEL_PORT}
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -fsS http://localhost:8000/api/health || exit 1
+  CMD curl -fsS "http://localhost:${PANEL_PORT}/api/health" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port \"${PANEL_PORT:-8000}\" --workers 1"]

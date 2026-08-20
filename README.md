@@ -51,7 +51,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-打开 `http://localhost:8000`，首次访问 `/setup` 创建管理员账号。
+打开 `http://localhost:8000`（默认端口，可用 `.env` 中的 `PANEL_PORT` 调整），首次访问 `/setup` 创建管理员账号。
 
 ## 加速源
 

@@ -4,15 +4,17 @@ services:
       context: .
       args:
         IMAGE_REGISTRY: ${IMAGE_REGISTRY:-docker.io/library}
+        PANEL_PORT: ${PANEL_PORT:-8000}
         APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     image: lipanel:local
     container_name: lipanel
     ports:
-      - "8000:8000"
+      - "${PANEL_PORT:-8000}:${PANEL_PORT:-8000}"
     environment:
       PANEL_DATA_DIR: /app/data
+      PANEL_PORT: ${PANEL_PORT:-8000}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PANEL_SECRET_KEY: ${PANEL_SECRET_KEY:?请在 .env 中设置 PANEL_SECRET_KEY}
       PANEL_PUBLIC_MODE: ${PANEL_PUBLIC_MODE:-true}

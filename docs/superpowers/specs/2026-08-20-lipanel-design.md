@@ -275,7 +275,7 @@ site_settings   (key TEXT PK, value TEXT, updated_at)
 
 - Dockerfile 多阶段：前端阶段（Node + Vite 产物）→ 后端阶段（`python:3.12-slim`，uv 安装依赖，非 root UID 10001，uvicorn 单 worker）
 - 加速源：`IMAGE_REGISTRY`（两基础镜像共用）、`APT_MIRROR`、`PIP_INDEX_URL`、`NPM_REGISTRY` 全部可替换
-- `compose.yaml`：`./data:/app/data`，端口 8000，`restart: unless-stopped`，healthcheck `GET /api/health`
+- `compose.yaml`：`./data:/app/data`，端口默认 8000（`PANEL_PORT` 可调，容器内与宿主机同一数值），`restart: unless-stopped`，healthcheck `GET /api/health`
 - `.env.example`：集中列出全部构建期与运行期变量及国内加速源示例
 - README 按 Li&Design 的 `reusable-readme.template.md` 生成，不留空占位符
 - 生产建议前置 Caddy/nginx 反代启用 HTTPS，并设 `PANEL_COOKIE_SECURE=true`
