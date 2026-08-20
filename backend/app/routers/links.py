@@ -229,11 +229,12 @@ def _auto_fetch_icon(request: Request, link_id: int, url: str) -> None:
     try:
         from app.db import connect
 
-        data = fetch_favicon(url)
-        if data is None:
+        result = fetch_favicon(url)
+        if result is None:
             set_cached(link_id, None)
             return
-        name = f"link-{link_id}-{secrets.token_hex(4)}.png"
+        data, ext = result
+        name = f"link-{link_id}-{secrets.token_hex(4)}.{ext}"
         favicons_dir = settings.data_dir / "favicons"
         favicons_dir.mkdir(parents=True, exist_ok=True)
         (favicons_dir / name).write_bytes(data)
@@ -368,11 +369,12 @@ def fetch_link_icon(
         return _link_dict(_owned_link(conn, lid, user["id"]))
     row = _owned_link(conn, lid, user["id"])
     url = row["url_wan"] or row["url_lan"]
-    data = fetch_favicon(url)
-    if data is None:
+    result = fetch_favicon(url)
+    if result is None:
         set_cached(lid, None)
         raise HTTPException(status_code=404, detail="未找到站点图标")
-    name = f"link-{lid}-{secrets.token_hex(4)}.png"
+    data, ext = result
+    name = f"link-{lid}-{secrets.token_hex(4)}.{ext}"
     favicons_dir = settings.data_dir / "favicons"
     favicons_dir.mkdir(parents=True, exist_ok=True)
     (favicons_dir / name).write_bytes(data)

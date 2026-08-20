@@ -43,6 +43,12 @@
 - 新建/编辑快捷方式时自动后台抓取站点 favicon（`BackgroundTasks`，受控出站与缓存复用，失败静默；自定义图标不覆盖；`PANEL_LINK_ICON_FETCH` 可关）；管理页新增「补抓缺失图标」批量按钮；保存后延迟刷新以显示新图标
 - 验证：pytest 156 passed；Playwright 端到端——新建链接自动生成 `/favicons/link-*` 图标、卡片右侧统一右对齐延迟文本
 
+2026-08-21 图标识别增强与延迟显示微调：
+
+- 图标抓取识别增强（`backend/app/favicon.py`）：HTMLParser 解析全部 `<link>` 候选（icon/shortcut icon/apple-touch-icon 等含 icon 的 rel）、按 `sizes` 择优（上限 512，同分优先 apple-touch-icon）、支持 `<base href>`、data: URI 内联图标、无 link 时回退源站 `/favicon.ico`、支持 SVG 并按真实 Content-Type 保存正确扩展名
+- 延迟显示紧贴状态点：状态点与延迟文本间距统一 4px，文本左对齐紧邻圆点（`min-w-12` + `tabular-nums` 保持各卡片对齐）
+- 验证：pytest 163 passed（新增 7 项识别测试：回退/择优/base/data URI/apple-touch/SVG）；Playwright 端到端——延迟间隙 4px 一致、自动抓取生成 `/favicons/link-*`
+
 2026-08-21 面板重复分组与健康检测触发修复：
 
 - 备份导入/恢复按分组名（大小写不敏感）合并复用，不再创建同名重复分组；链接仍按追加语义进入对应分组（`backend/app/routers/backup.py`）
