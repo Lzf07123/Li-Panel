@@ -202,6 +202,23 @@ export const tagsApi = {
     }),
 };
 
+export const sessionsApi = {
+  list: () =>
+    api<
+      {
+        id: number;
+        created_at: string;
+        last_used_at: string | null;
+        expires_at: string;
+        current: boolean;
+      }[]
+    >("/api/sessions"),
+  revoke: (id: number) =>
+    api<{ revoked: number }>(`/api/sessions/${id}`, { method: "DELETE" }),
+  revokeAll: () =>
+    api<{ revoked: number }>("/api/sessions", { method: "DELETE" }),
+};
+
 export const ssoApi = {
   status: () =>
     api<{

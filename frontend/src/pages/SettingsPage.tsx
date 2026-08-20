@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { authApi, backupApi, groupsApi, linksApi, rssApi, settingsApi, ssoApi, tagsApi } from "../api/client";
+import { authApi, backupApi, groupsApi, linksApi, rssApi, sessionsApi, settingsApi, ssoApi, tagsApi } from "../api/client";
 import type { GroupOut, LinkOut, MeOut, SiteSettings } from "../api/types";
 import { AppHeader } from "../components/AppHeader";
 import { AsyncButton } from "../components/AsyncButton";
@@ -81,6 +81,15 @@ export function SettingsPage() {
   const [rssUrls, setRssUrls] = useState<string[]>(["", "", ""]);
   const [unbindOpen, setUnbindOpen] = useState(false);
   const [unbindPassword, setUnbindPassword] = useState("");
+  const [sessions, setSessions] = useState<
+    {
+      id: number;
+      created_at: string;
+      last_used_at: string | null;
+      expires_at: string;
+      current: boolean;
+    }[]
+  >([]);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
   const isAdmin = me?.user.role === "admin";
@@ -139,6 +148,10 @@ export function SettingsPage() {
         .listSnapshots()
         .then(setSnapshots)
         .catch(() => setSnapshots([]));
+      sessionsApi
+        .list()
+        .then(setSessions)
+        .catch(() => setSessions([]));
     }
   }, [tab]);
 
@@ -213,6 +226,18 @@ export function SettingsPage() {
     },
     { onError: (err) => setError(err.message) },
   );
+
+  const revokeSessionAction = useAsyncAction(async (id: number) => {
+    await sessionsApi.revoke(id);
+    setSessions(await sessionsApi.list());
+    toast.success("会话已吊销");
+  }, { onError: (err) => setError(err.message) });
+
+  const revokeAllSessionsAction = useAsyncAction(async () => {
+    const result = await sessionsApi.revokeAll();
+    setSessions(await sessionsApi.list());
+    toast.success(`已吊销 ${result.revoked} 个其他会话`);
+  }, { onError: (err) => setError(err.message) });
 
   const unbindSsoAction = useAsyncAction(async () => {
     await ssoApi.unbind(unbindPassword);
@@ -1330,6 +1355,50 @@ export function SettingsPage() {
                   ) : (
                     <p className="mt-1 text-sm text-muted">未绑定</p>
                   )}
+                </div>
+                <div className="rounded-xl border border-border p-4">
+                  <p className="text-sm font-medium text-foreground">会话管理</p>
+                  <p className="mt-1 text-xs text-muted">
+                    查看并吊销其他设备上的登录会话。
+                  </p>
+                  {sessions.length > 0 ? (
+                    <ul className="mt-3 max-h-40 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                      {sessions.map((session) => (
+                        <li
+                          key={session.id}
+                          className="flex items-center gap-2 px-3 py-2 text-xs"
+                        >
+                          <span className="min-w-0 truncate text-muted">
+                            最近使用 {session.last_used_at ?? session.created_at}
+                          </span>
+                          {session.current ? (
+                            <span className="badge badge-primary shrink-0">
+                              当前
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-danger ml-auto h-7 shrink-0 px-2 text-xs"
+                              disabled={revokeSessionAction.status === "pending"}
+                              onClick={() => void revokeSessionAction.run(session.id)}
+                            >
+                              吊销
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {sessions.some((session) => !session.current) ? (
+                    <AsyncButton
+                      type="button"
+                      status={revokeAllSessionsAction.status}
+                      className="btn btn-ghost mt-3 h-8 px-3 text-xs"
+                      onClick={() => void revokeAllSessionsAction.run()}
+                    >
+                      吊销其他会话
+                    </AsyncButton>
+                  ) : null}
                 </div>
                 <div className="rounded-xl border border-border p-4">
                   <p className="text-sm font-medium text-foreground">RSS 订阅</p>

@@ -96,6 +96,7 @@
 - V34 Host 白名单：`PANEL_ALLOWED_HOSTS`（精确/`*.` 通配，为空放行）；security 中间件先校验 Host；pytest 126 passed
 - V35 登录锁定：`LoginLockout`（用户名+IP，`PANEL_LOGIN_MAX_FAILS`/`PANEL_LOGIN_LOCK_MINUTES`，成功重置，未知用户同行为）；登录接口 429；pytest 130 passed
 - V36 角色与权限：site_settings 写接口 admin-only（403），读公开；前端按角色过滤「站点信息」标签页；pytest 133 passed
+- V37 会话管理：`GET /api/sessions`（current 标记）、`DELETE /api/sessions/{id}`（当前拒绝 400、跨用户 404）、`DELETE /api/sessions`（吊销其他）；个人设置页会话卡片；pytest 138 passed
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
