@@ -1,7 +1,7 @@
 import { createContext } from "react";
 import type { ReactNode } from "react";
 
-export type ToastType = "success" | "error" | "warning" | "info";
+export type ToastType = "success" | "error" | "warning" | "info" | "loading";
 
 export interface ToastAction {
   label: string;
@@ -21,6 +21,7 @@ export interface ToastApi {
   error: (message: ReactNode, options?: ToastOptions) => number;
   warning: (message: ReactNode, options?: ToastOptions) => number;
   info: (message: ReactNode, options?: ToastOptions) => number;
+  loading: (message: ReactNode, options?: ToastOptions) => number;
   dismiss: (id: number) => void;
 }
 

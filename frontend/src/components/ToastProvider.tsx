@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { useI18n } from "../lib/i18n";
 import { StatusIcon } from "./bits/StatusIcon";
 import {
   ToastContext,
@@ -33,19 +34,23 @@ const DEFAULT_DURATION: Record<ToastType, number> = {
   error: 6000,
   warning: 6000,
   info: 4000,
+  loading: 0, // 常驻，由调用方 dismiss
 };
 
-const DEFAULT_TITLES: Record<ToastType, string> = {
-  success: "操作成功",
-  error: "出错了",
-  warning: "请注意",
-  info: "提示",
-};
+const MAX_STACK = 5;
 
 const EXIT_MS = 220;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const { t } = useI18n();
+  const DEFAULT_TITLES: Record<ToastType, string> = {
+    success: t("操作成功"),
+    error: t("出错了"),
+    warning: t("请注意"),
+    info: t("提示"),
+    loading: t("处理中"),
+  };
   const nextId = useRef(1);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const exitTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -79,9 +84,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (type: ToastType, message: ReactNode, options?: ToastOptions) => {
       const id = nextId.current++;
       const duration = options?.duration ?? DEFAULT_DURATION[type];
-      setToasts((prev) => [
-        ...prev,
-        {
+      setToasts((prev) => {
+        const item = {
           id,
           type,
           title: options?.title ?? DEFAULT_TITLES[type],
@@ -89,8 +93,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           duration,
           action: options?.action,
           leaving: false,
-        },
-      ]);
+        };
+        const next = [...prev, item];
+        // 超出最大堆叠：移除最早的非退出项
+        if (next.length > MAX_STACK) {
+          const oldest = next.find(
+            (toast) => !toast.leaving && toast.id !== id,
+          );
+          if (oldest) {
+            return next.filter((toast) => toast.id !== oldest.id);
+          }
+        }
+        return next;
+      });
       if (duration > 0) {
         timers.current.set(
           id,
@@ -109,6 +124,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       error: (message, options) => push("error", message, options),
       warning: (message, options) => push("warning", message, options),
       info: (message, options) => push("info", message, options),
+      loading: (message, options) => push("loading", message, options),
       dismiss,
     }),
     [push, dismiss],
@@ -162,7 +178,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               )}
               <button
                 type="button"
-                aria-label="关闭通知"
+                aria-label={t("关闭通知")}
                 onClick={() => dismiss(toast.id)}
                 className="toast-close"
               >

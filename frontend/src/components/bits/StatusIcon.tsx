@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type StatusType = "success" | "error" | "warning" | "info";
+export type StatusType = "success" | "error" | "warning" | "info" | "loading";
 
 const ICON_PATHS: Record<StatusType, ReactNode> = {
   success: (
@@ -30,6 +30,12 @@ const ICON_PATHS: Record<StatusType, ReactNode> = {
       <path d="M12 8h.01" />
     </>
   ),
+  loading: (
+    <>
+      <circle cx="12" cy="12" r="8" strokeDasharray="30 22" strokeDashoffset="0" />
+      <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export function StatusIcon({
@@ -48,7 +54,7 @@ export function StatusIcon({
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className={className}
+      className={`${type === "loading" ? "animate-spin" : ""} ${className ?? ""}`}
     >
       {ICON_PATHS[type]}
     </svg>

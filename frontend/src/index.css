@@ -655,6 +655,12 @@
   .toast-info .toast-progress {
     @apply bg-primary/50;
   }
+  .toast-loading {
+    @apply border-l-4 border-l-primary;
+  }
+  .toast-loading .toast-icon {
+    @apply bg-primary-soft text-primary;
+  }
   .toast-enter {
     animation: toast-in 320ms var(--ease-spring) both;
     animation-delay: calc(var(--toast-index, 0) * 40ms);
