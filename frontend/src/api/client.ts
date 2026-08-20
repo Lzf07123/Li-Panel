@@ -185,6 +185,15 @@ export const tagsApi = {
     }),
 };
 
+export const backupApi = {
+  export: () => api<Record<string, unknown>>("/api/backup"),
+  import: (data: unknown) =>
+    api<{ imported: Record<string, number> }>("/api/backup", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 export const settingsApi = {
   site: () => api<SiteSettings>("/api/site-settings"),
   updateSite: (

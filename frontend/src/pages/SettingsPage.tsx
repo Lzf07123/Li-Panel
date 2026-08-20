@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { authApi, groupsApi, linksApi, settingsApi, tagsApi } from "../api/client";
+import { authApi, backupApi, groupsApi, linksApi, settingsApi, tagsApi } from "../api/client";
 import type { GroupOut, LinkOut, MeOut, SiteSettings } from "../api/types";
 import { AppHeader } from "../components/AppHeader";
 import { AsyncButton } from "../components/AsyncButton";
@@ -170,6 +170,36 @@ export function SettingsPage() {
       await linksApi.fetchIcon(link.id);
       setLinks(await linksApi.list());
       toast.success(`「${link.name}」图标已抓取`);
+    },
+    { onError: (err) => setError(err.message) },
+  );
+
+  const exportBackupAction = useAsyncAction(async () => {
+    const data = await backupApi.export();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+    anchor.href = url;
+    anchor.download = `lipanel-backup-${date}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success("备份已导出");
+  }, { onError: (err) => setError(err.message) });
+
+  const importBackupAction = useAsyncAction(
+    async (file: File) => {
+      const text = await file.text();
+      const data: unknown = JSON.parse(text);
+      const result = await backupApi.import(data);
+      const counts = result.imported;
+      setGroups(await groupsApi.list());
+      setLinks(await linksApi.list());
+      toast.success(
+        `导入完成：分组 ${counts.groups}、链接 ${counts.links}、设置 ${counts.settings}、站点 ${counts.site_settings}`,
+      );
     },
     { onError: (err) => setError(err.message) },
   );
@@ -1113,6 +1143,37 @@ export function SettingsPage() {
                   ) : (
                     <p className="mt-1 text-sm text-muted">未绑定</p>
                   )}
+                </div>
+                <div className="rounded-xl border border-border p-4">
+                  <p className="text-sm font-medium text-foreground">数据备份</p>
+                  <p className="mt-1 text-xs text-muted">
+                    导出分组、快捷方式与个人设置；导入为追加合并，不会删除现有数据。
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <AsyncButton
+                      type="button"
+                      status={exportBackupAction.status}
+                      className="btn btn-ghost h-8 px-3 text-xs"
+                      onClick={() => void exportBackupAction.run()}
+                    >
+                      导出备份
+                    </AsyncButton>
+                    <label className="btn btn-ghost h-8 cursor-pointer px-3 text-xs">
+                      {importBackupAction.status === "pending"
+                        ? "导入中…"
+                        : "导入备份"}
+                      <input
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void importBackupAction.run(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
             ) : null}

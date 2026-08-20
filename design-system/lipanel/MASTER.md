@@ -77,6 +77,7 @@
 - V15 批量操作：`POST /api/links/batch-delete|batch-move|batch-visibility`（全量 user_id 校验、空列表 422、目标分组归属校验）；管理页链接表复选框 + 全选 + 批量操作栏（删除/移动/公开/私密）与确认弹窗；pytest 59 passed，Playwright 批量设公开端到端通过
 - V16 标签管理页：`GET /api/tags`（按用户统计）、`PUT/DELETE /api/tags/{tag}`（重命名全量更新去重保序、删除；URL 编码中文标签；跨用户隔离）；设置页新增「标签管理」标签页（计数、行内重命名、删除确认）；pytest 65 passed，Playwright 重命名端到端通过
 - V17 重复检测：创建/编辑同名（NOCASE）或同 `url_lan` 返回 409 `{code:"duplicate", message}`（排除自身、`force:true` 强制保存）；前端 API 客户端解析结构化 detail，表单显示「已存在…」提示 + 「仍要保存」；pytest 70 passed，Playwright 409→强制保存端到端通过
+- V18 JSON 备份导出/导入：`GET /api/backup`（本人分组/链接/设置，管理员含 site_settings）；`POST /api/backup` 结构+URL 校验后追加导入（新 id 映射、设置 upsert、管理员站点设置 upsert）；个人设置页「数据备份」卡片（导出下载、JSON 文件导入）；pytest 76 passed，Playwright 导出→导入追加端到端通过
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
