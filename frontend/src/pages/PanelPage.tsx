@@ -23,7 +23,7 @@ import { TechAmbience } from "../components/bits/TechAmbience";
 import { useToast } from "../hooks/useToast";
 import { useI18n } from "../lib/i18n";
 
-function matches(link: LinkOut, query: string): boolean {
+export function matches(link: LinkOut, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return (
