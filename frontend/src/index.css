@@ -1,0 +1,406 @@
+/* =============================================================
+   Li& 系列 · 品牌令牌骨架（Tailwind CSS 4）· V1.2 海玻璃示例
+
+   用法（详见同目录 REUSABLE-BRAND-SCHEME.md §4.2）：
+   ⚠️ 本模板仅首次设计时复制使用，落地后以项目内文件为准。
+   1. 复制本文件到新项目 frontend/src/index.css
+   2. 全局替换 lipanel 为项目技术标识（如 lipass / chat）
+   3. 按槽位表 7–12、16、21–22 填主色、中性色、语义色、强调色（明暗两套）
+   4. 组件一律引用语义类（bg-primary 等），禁止硬编码 hex
+
+   铁律：
+   - 全淡色口径（示例定稿）：无粉色系、无大面积重色；深色 = 雾灰中间调不压黑
+   - 主按钮用半透明单色着色 + 细描边，不用多色渐变色块
+   - 阴影透明度总和 < 0.1；动效只动 transform/opacity/background-position
+   - 每个 animation 必须有对应 @keyframes（科技光效层尤其注意）
+   - 尊重 prefers-reduced-motion；移动端减量省电
+============================================================= */
+
+@import "tailwindcss";
+
+/* 基于 class 的深色模式（html.dark） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* 字体：不加载远程字体，优先本机，中文回退 PingFang SC / 微软雅黑 */
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+
+  /* 语义别名：组件只引用这一层，值由 :root / .dark 提供 */
+  --color-background: var(--lipanel-bg);
+  --color-surface: var(--lipanel-surface);
+  --color-surface-2: var(--lipanel-surface-2);
+  --color-foreground: var(--lipanel-fg);
+  --color-muted: var(--lipanel-muted);
+  --color-border: var(--lipanel-border);
+
+  --color-primary: var(--lipanel-primary);
+  --color-primary-hover: var(--lipanel-primary-hover);
+  --color-primary-soft: var(--lipanel-primary-soft);
+  --color-primary-foreground: var(--lipanel-primary-fg);
+
+  --color-secondary: var(--lipanel-secondary);
+  --color-secondary-soft: var(--lipanel-secondary-soft);
+
+  --color-success: var(--lipanel-success);
+  --color-success-soft: var(--lipanel-success-soft);
+  --color-warning: var(--lipanel-warning);
+  --color-warning-soft: var(--lipanel-warning-soft);
+  --color-destructive: var(--lipanel-destructive);
+  --color-destructive-soft: var(--lipanel-destructive-soft);
+  --color-destructive-foreground: var(--lipanel-destructive-fg);
+
+  --color-accent-ice: var(--lipanel-accent-ice);
+  --color-accent-ice-soft: var(--lipanel-accent-ice-soft);
+  --color-accent-aqua: var(--lipanel-accent-aqua);
+  --color-accent-aqua-soft: var(--lipanel-accent-aqua-soft);
+  --color-accent-lilac: var(--lipanel-accent-lilac);
+  --color-accent-lilac-soft: var(--lipanel-accent-lilac-soft);
+  --color-accent-sage: var(--lipanel-accent-sage);
+  --color-accent-sage-soft: var(--lipanel-accent-sage-soft);
+  --color-accent-mint: var(--lipanel-accent-mint);
+  --color-accent-mint-soft: var(--lipanel-accent-mint-soft);
+  --color-accent-sand: var(--lipanel-accent-sand);
+  --color-accent-sand-soft: var(--lipanel-accent-sand-soft);
+
+  --color-ring: var(--lipanel-ring);
+}
+
+/* 浅色模式：海玻璃全淡色（无粉色、无重色；60/30/10 比例，强调色 ≤15%） */
+:root {
+  --lipanel-bg: #f6fbf9;
+  --lipanel-surface: #ffffff;
+  --lipanel-surface-2: #eef6f3;
+  --lipanel-fg: #35423f;
+  --lipanel-muted: #71807a;
+  --lipanel-border: #e1ece8;
+
+  --lipanel-primary: #25786d;
+  --lipanel-primary-hover: #1f6359;
+  --lipanel-primary-soft: #d9f4ee;
+  --lipanel-primary-fg: #ffffff;
+
+  --lipanel-secondary: #2f678f;
+  --lipanel-secondary-soft: #dff1fa;
+
+  --lipanel-success: #2f8f5f;
+  --lipanel-success-soft: #e3f6e9;
+  --lipanel-warning: #a16207;
+  --lipanel-warning-soft: #fdf3d8;
+  --lipanel-destructive: #cf3d3d;
+  --lipanel-destructive-soft: #fdeeee;
+  --lipanel-destructive-fg: #ffffff;
+
+  --lipanel-accent-ice: #2f678f;
+  --lipanel-accent-ice-soft: #dff1fa;
+  --lipanel-accent-aqua: #25786d;
+  --lipanel-accent-aqua-soft: #d9f4ee;
+  --lipanel-accent-lilac: #51488f;
+  --lipanel-accent-lilac-soft: #edeafb;
+  --lipanel-accent-sage: #557546;
+  --lipanel-accent-sage-soft: #eaf2e3;
+  --lipanel-accent-mint: #2f7c52;
+  --lipanel-accent-mint-soft: #e3f6e9;
+  --lipanel-accent-sand: #876741;
+  --lipanel-accent-sand-soft: #f7efe0;
+
+  --lipanel-ring: #25786d;
+
+  /* 主按钮：半透明单色着色 + 细描边（浅色侧），文字用深青 */
+  --lipanel-btn-primary-bg: rgba(47, 127, 116, 0.1);
+  --lipanel-btn-primary-bg-hover: rgba(47, 127, 116, 0.17);
+  --lipanel-btn-primary-border: rgba(47, 127, 116, 0.26);
+  --lipanel-brand-fg: #24433e;
+
+  /* 海玻璃粉彩流光线（签名描边/流光规则线/顶栏流光线共用） */
+  --lipanel-flow-gradient: linear-gradient(
+    90deg,
+    #7fd4c6,
+    #8fc7f0,
+    #a9a2e8,
+    #a9cc8f,
+    #7fd4c6
+  );
+
+  /* 科技光效层（网格/光束/光点），浅色侧 */
+  --lipanel-tech-grid-line: rgba(47, 127, 116, 0.09);
+  --lipanel-tech-grid-accent: rgba(127, 212, 198, 0.22);
+  --lipanel-tech-grid-accent-2: rgba(74, 143, 191, 0.18);
+  --lipanel-tech-beam: rgba(127, 212, 198, 0.26);
+  --lipanel-tech-beam-2: rgba(143, 199, 240, 0.22);
+  --lipanel-tech-beam-3: rgba(176, 199, 158, 0.2);
+  --lipanel-tech-dot-glow: rgba(127, 212, 198, 0.6);
+
+  /* 弥散阴影（水绿 tint，透明度总和 < 0.1，三层叠加） */
+  --shadow-sm: 0px 0.6px 1.8px rgba(24, 58, 51, 0.04),
+    0px 2.4px 7.2px rgba(24, 58, 51, 0.05);
+  --shadow-md: 0px 0.6px 1.8px rgba(24, 58, 51, 0.04),
+    0px 2.4px 7.2px rgba(24, 58, 51, 0.05),
+    0px 8px 24px rgba(24, 58, 51, 0.08);
+  --shadow-lg: 0px 0.6px 1.8px rgba(24, 58, 51, 0.04),
+    0px 2.4px 7.2px rgba(24, 58, 51, 0.05),
+    0px 8px 32px rgba(24, 58, 51, 0.1);
+
+  /* 缓动曲线与时长 */
+  --ease-out: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-in: cubic-bezier(0.55, 0.06, 0.68, 0.19);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 350ms;
+
+  color-scheme: light;
+}
+
+/* 深色模式：D1 雾灰中间调（不压黑），主色取雾面 300 档 */
+.dark {
+  --lipanel-bg: #3a3f45;
+  --lipanel-surface: #434950;
+  --lipanel-surface-2: #4b5259;
+  --lipanel-fg: #f0f2f4;
+  --lipanel-muted: #b8c0c7;
+  --lipanel-border: #545c64;
+
+  --lipanel-primary: #7fd4c6;
+  --lipanel-primary-hover: #a5e4d9;
+  --lipanel-primary-soft: rgba(127, 212, 198, 0.16);
+  --lipanel-primary-fg: #17332e;
+
+  --lipanel-secondary: #a8d4f0;
+  --lipanel-secondary-soft: rgba(168, 212, 240, 0.16);
+
+  --lipanel-success: #86d6ac;
+  --lipanel-success-soft: rgba(134, 214, 172, 0.14);
+  --lipanel-warning: #ead48e;
+  --lipanel-warning-soft: rgba(234, 212, 142, 0.14);
+  --lipanel-destructive: #e8a49a;
+  --lipanel-destructive-soft: rgba(232, 164, 154, 0.14);
+  --lipanel-destructive-fg: #43211d;
+
+  --lipanel-accent-ice: #a8cbe8;
+  --lipanel-accent-ice-soft: rgba(168, 203, 232, 0.16);
+  --lipanel-accent-aqua: #7fd4c6;
+  --lipanel-accent-aqua-soft: rgba(127, 212, 198, 0.16);
+  --lipanel-accent-lilac: #b0a8de;
+  --lipanel-accent-lilac-soft: rgba(176, 168, 222, 0.18);
+  --lipanel-accent-sage: #b0c79e;
+  --lipanel-accent-sage-soft: rgba(176, 199, 158, 0.18);
+  --lipanel-accent-mint: #9adfad;
+  --lipanel-accent-mint-soft: rgba(154, 223, 173, 0.16);
+  --lipanel-accent-sand: #d9c49e;
+  --lipanel-accent-sand-soft: rgba(217, 196, 158, 0.16);
+
+  --lipanel-ring: #7fd4c6;
+
+  --lipanel-btn-primary-bg: rgba(127, 212, 198, 0.13);
+  --lipanel-btn-primary-bg-hover: rgba(127, 212, 198, 0.21);
+  --lipanel-btn-primary-border: rgba(127, 212, 198, 0.3);
+  --lipanel-brand-fg: #d7efea;
+
+  --lipanel-flow-gradient: linear-gradient(
+    90deg,
+    rgba(127, 212, 198, 0.65),
+    rgba(168, 212, 240, 0.65),
+    rgba(176, 168, 222, 0.65),
+    rgba(176, 199, 158, 0.6),
+    rgba(127, 212, 198, 0.65)
+  );
+
+  --lipanel-tech-grid-line: rgba(176, 199, 158, 0.13);
+  --lipanel-tech-grid-accent: rgba(127, 212, 198, 0.18);
+  --lipanel-tech-grid-accent-2: rgba(168, 212, 240, 0.16);
+  --lipanel-tech-beam: rgba(127, 212, 198, 0.2);
+  --lipanel-tech-beam-2: rgba(168, 212, 240, 0.19);
+  --lipanel-tech-beam-3: rgba(176, 199, 158, 0.15);
+  --lipanel-tech-dot-glow: rgba(127, 212, 198, 0.55);
+
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+
+  /* 键盘焦点始终可见：2px 主色描边 + 2px 偏移 */
+  :focus-visible {
+    outline: 2px solid var(--lipanel-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* 尊重系统减弱偏好：全部动效收敛为单帧 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* 卡片：表面 + 边框 + 16px 圆角 + 弥散阴影；hover 仅 1px 上移 + 阴影变化 */
+  .card {
+    @apply rounded-2xl border border-border bg-surface shadow-sm;
+    transition:
+      transform var(--motion-base) var(--ease-out),
+      box-shadow var(--motion-base) var(--ease-out);
+    will-change: transform;
+  }
+  .card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* 按钮：统一 8px 圆角；可点击必须有 cursor-pointer；按压 scale(0.97) */
+  .btn {
+    @apply relative inline-flex cursor-pointer select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg px-4 py-3 text-sm font-medium leading-none disabled:pointer-events-none disabled:opacity-50;
+    transition:
+      color var(--motion-fast) var(--ease-out),
+      background-color var(--motion-fast) var(--ease-out),
+      border-color var(--motion-fast) var(--ease-out),
+      box-shadow var(--motion-fast) var(--ease-out),
+      transform var(--motion-base) var(--ease-spring);
+    will-change: transform;
+  }
+  .btn:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .btn:not(:disabled):active {
+    transform: translateY(0) scale(0.97);
+  }
+  .btn-primary {
+    @apply shadow-sm;
+    color: var(--lipanel-brand-fg);
+    background-color: var(--lipanel-btn-primary-bg);
+    border: 1px solid var(--lipanel-btn-primary-border);
+  }
+  .btn-primary:not(:disabled):hover {
+    background-color: var(--lipanel-btn-primary-bg-hover);
+    box-shadow: var(--shadow-md);
+  }
+  .btn-secondary {
+    @apply border border-border bg-surface text-foreground hover:bg-surface-2;
+  }
+  .btn-ghost {
+    @apply text-muted hover:bg-surface-2 hover:text-foreground;
+  }
+  .btn-danger {
+    @apply bg-destructive text-destructive-foreground shadow-sm hover:opacity-90;
+  }
+  .btn-link {
+    @apply cursor-pointer whitespace-nowrap px-0 py-0 text-primary hover:underline;
+  }
+
+  /* 表单 */
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-foreground;
+  }
+  .input {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground shadow-sm placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20;
+    transition:
+      border-color var(--motion-fast) var(--ease-out),
+      box-shadow var(--motion-fast) var(--ease-out),
+      background-color var(--motion-fast) var(--ease-out);
+  }
+
+  /* 徽章 */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+  .badge-success {
+    @apply bg-success-soft text-success;
+  }
+  .badge-warning {
+    @apply bg-warning-soft text-warning;
+  }
+  .badge-danger {
+    @apply bg-destructive-soft text-destructive;
+  }
+  .badge-muted {
+    @apply bg-surface-2 text-muted;
+  }
+  .badge-primary {
+    @apply bg-primary-soft text-primary;
+  }
+}
+
+@layer utilities {
+  /* 路由切换：整页淡入上移 */
+  @keyframes page-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .page-enter {
+    animation: page-fade-up var(--motion-slow) var(--ease-out) both;
+  }
+
+  /* 骨架扫光（background-position 动画，不触发重排） */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--lipanel-surface-2) 25%,
+      rgba(255, 255, 255, 0.65) 37%,
+      var(--lipanel-surface-2) 63%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  /* 加载旋转 */
+  .spinner {
+    display: inline-block;
+    height: 1rem;
+    width: 1rem;
+    border-radius: 9999px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+/* =============================================================
+   氛围与科技光效层（按槽位 19/22 接入）
+   - FloatingBackground（Canvas）：z-0 垫底、pointer-events: none；
+     认证 10 / 授权 4 / 中心 10 + scrollWind / 后台 4 × 0.5
+   - AuroraBackground：4 枚弥散光斑（18/22/28/24s），工作台/后台 aurora-soft
+   - TechAmbience：缓移网格 12s + 3 条光束 10s（错峰）+ 8 枚光点 6s；
+     认证默认、工作台/后台 soft；移动端隐藏光束/光点并停用网格动画
+   - ⚠️ 每个 animation 必须定义对应 @keyframes；reduced-motion 下单帧
+============================================================= */
