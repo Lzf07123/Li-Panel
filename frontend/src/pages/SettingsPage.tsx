@@ -17,6 +17,14 @@ import { useToast } from "../hooks/useToast";
 import { GROUP_ICON_NAMES, isGroupIconName } from "../components/GroupIcon";
 import type { GroupIconName } from "../components/GroupIcon";
 import { formatTags, parseTags } from "../lib/tags";
+import {
+  ICP_FILING_ICON_ENV,
+  ICP_FILING_TEXT_ENV,
+  ICP_FILING_URL_ENV,
+  POLICE_FILING_ICON_ENV,
+  POLICE_FILING_TEXT_ENV,
+  POLICE_FILING_URL_ENV,
+} from "../lib/brand";
 
 type Tab = "site" | "manage" | "tags" | "personal";
 
@@ -101,6 +109,18 @@ export function SettingsPage() {
   };
   const isAdmin = me?.user.role === "admin";
   const visibleTabs = TABS.filter((item) => item.key !== "site" || isAdmin);
+  // 构建期显式配置的备案环境变量：非空即优先，后台修改不生效
+  const filingEnvOverrides = [
+    { name: "VITE_ICP_FILING_TEXT", label: t("备案号"), value: ICP_FILING_TEXT_ENV },
+    { name: "VITE_ICP_FILING_URL", label: t("备案链接"), value: ICP_FILING_URL_ENV },
+    { name: "VITE_ICP_FILING_ICON", label: t("备案图标"), value: ICP_FILING_ICON_ENV },
+    { name: "VITE_POLICE_FILING_TEXT", label: t("公安备案号"), value: POLICE_FILING_TEXT_ENV },
+    { name: "VITE_POLICE_FILING_URL", label: t("公安备案链接"), value: POLICE_FILING_URL_ENV },
+    { name: "VITE_POLICE_FILING_ICON", label: t("公安备案图标"), value: POLICE_FILING_ICON_ENV },
+  ].filter((item) => item.value !== "");
+  const filingEnvNames = filingEnvOverrides
+    .map((item) => `${item.name}（${item.label}）`)
+    .join("、");
 
   useEffect(() => {
     if (me && !isAdmin && tab === "site") {
@@ -171,6 +191,13 @@ export function SettingsPage() {
       const next = await settingsApi.updateSite(patch);
       setSite(next);
       toast.success(t("站点信息已保存"));
+      if (filingEnvNames) {
+        toast.warning(
+          t("注意：备案信息由环境变量优先，本次修改的备案字段不会生效（{names}）", {
+            names: filingEnvNames,
+          }),
+        );
+      }
     },
     {
       onError: (err) =>
@@ -634,6 +661,14 @@ export function SettingsPage() {
                     </div>
                   </div>
                 </div>
+                {filingEnvNames ? (
+                  <Notice intent="warning">
+                    {t(
+                      "备案信息优先读取构建期环境变量（{names}），后台修改不会生效；如需生效请清除对应 VITE_* 变量后重新构建。",
+                      { names: filingEnvNames },
+                    )}
+                  </Notice>
+                ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
                     <span className="label">页脚文案</span>

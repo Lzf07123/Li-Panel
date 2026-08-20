@@ -12,6 +12,25 @@ function envString(name: string, fallback: string): string {
     : fallback;
 }
 
+/** 读取原始环境变量（未设置/空串返回 ""），用于判断备案变量是否在构建期显式配置 */
+function envRaw(name: string): string {
+  const value = env[name];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** 环境变量优先：env 非空取 env，否则回退后台值/默认值（备案信息以构建期 VITE_* 为事实来源） */
+export function envFirst(envValue: string, fallback: string): string {
+  return envValue !== "" ? envValue : fallback;
+}
+
+/** 备案字段的原始环境变量值（非空即表示构建期显式配置，后台修改不生效） */
+export const ICP_FILING_TEXT_ENV = envRaw("VITE_ICP_FILING_TEXT");
+export const ICP_FILING_URL_ENV = envRaw("VITE_ICP_FILING_URL");
+export const ICP_FILING_ICON_ENV = envRaw("VITE_ICP_FILING_ICON");
+export const POLICE_FILING_TEXT_ENV = envRaw("VITE_POLICE_FILING_TEXT");
+export const POLICE_FILING_URL_ENV = envRaw("VITE_POLICE_FILING_URL");
+export const POLICE_FILING_ICON_ENV = envRaw("VITE_POLICE_FILING_ICON");
+
 export const APP_NAME = envString("VITE_APP_NAME", "Li&Panel");
 export const APP_TAGLINE = envString(
   "VITE_APP_TAGLINE",

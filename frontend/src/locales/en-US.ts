@@ -123,6 +123,8 @@ export const enUS: Record<string, string> = {
   "公安备案号": "Police filing",
   "公安备案链接": "Police filing URL",
   "公安备案图标": "Police icon",
+  "备案信息优先读取构建期环境变量（{names}），后台修改不会生效；如需生效请清除对应 VITE_* 变量后重新构建。": "Filing info is overridden by build-time environment variables ({names}); changes here won't take effect. Remove the VITE_* variables and rebuild to apply.",
+  "注意：备案信息由环境变量优先，本次修改的备案字段不会生效（{names}）": "Note: filing info prefers environment variables ({names}); the fields you just changed won't take effect.",
   "允许访客查看公开内容": "Allow guests to view public content",
   "保存站点信息": "Save site info",
   "Logo": "Logo",

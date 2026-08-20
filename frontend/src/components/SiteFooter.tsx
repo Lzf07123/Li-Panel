@@ -10,13 +10,20 @@ import {
   GITHUB_ISSUES_URL,
   GITHUB_URL,
   ICP_FILING_ICON,
+  ICP_FILING_ICON_ENV,
   ICP_FILING_TEXT,
+  ICP_FILING_TEXT_ENV,
   ICP_FILING_URL,
+  ICP_FILING_URL_ENV,
   LICENSE_NAME,
   LICENSE_URL,
   POLICE_FILING_ICON,
+  POLICE_FILING_ICON_ENV,
   POLICE_FILING_TEXT,
+  POLICE_FILING_TEXT_ENV,
   POLICE_FILING_URL,
+  POLICE_FILING_URL_ENV,
+  envFirst,
 } from "../lib/brand";
 
 function FilingLink({
@@ -64,19 +71,26 @@ function FilingLinks({
   site?: SiteSettings | null;
 }) {
   // 运行时以后台 site_settings 为事实来源，未配置时回退品牌默认值
+  // 备案信息优先构建期环境变量（VITE_*），未配置时才使用后台 site_settings 值
   const entries = [
     {
       key: "icp",
-      text: site?.icp ?? ICP_FILING_TEXT,
-      href: site?.icp_url ?? ICP_FILING_URL,
-      icon: site?.icp_icon ?? ICP_FILING_ICON,
+      text: envFirst(ICP_FILING_TEXT_ENV, site?.icp ?? ICP_FILING_TEXT),
+      href: envFirst(ICP_FILING_URL_ENV, site?.icp_url ?? ICP_FILING_URL),
+      icon: envFirst(ICP_FILING_ICON_ENV, site?.icp_icon ?? ICP_FILING_ICON),
       placeholder: "备",
     },
     {
       key: "police",
-      text: site?.police_text ?? POLICE_FILING_TEXT,
-      href: site?.police_url ?? POLICE_FILING_URL,
-      icon: site?.police_icon ?? POLICE_FILING_ICON,
+      text: envFirst(
+        POLICE_FILING_TEXT_ENV,
+        site?.police_text ?? POLICE_FILING_TEXT,
+      ),
+      href: envFirst(POLICE_FILING_URL_ENV, site?.police_url ?? POLICE_FILING_URL),
+      icon: envFirst(
+        POLICE_FILING_ICON_ENV,
+        site?.police_icon ?? POLICE_FILING_ICON,
+      ),
       placeholder: "公",
     },
   ].filter((entry) => entry.text !== "");
@@ -139,7 +153,7 @@ export function SiteFooter({
 
   return (
     <footer className="relative mt-auto border-t border-border/60 bg-surface/60 backdrop-blur">
-      <div className="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-5 text-xs text-muted lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-5 text-xs text-muted lg:px-8">
         <span>© {year} {COPYRIGHT_HOLDER} · v{APP_VERSION}</span>
         {site?.footer_text ? (
           <span className="whitespace-nowrap">{site.footer_text}</span>
