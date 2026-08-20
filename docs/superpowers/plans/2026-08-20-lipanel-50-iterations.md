@@ -140,5 +140,6 @@
 - ✅ V11（链接拖拽排序）：2026-08-21 完成。`PATCH /api/links/order`（整体重排、跨用户 404、重复 400）+ 面板 HTML5 组内拖拽（跨分组提示、失败回滚）。pytest 40 passed；Playwright 端到端：拖拽后顺序持久化。
 - ✅ V12（分组拖拽排序）：2026-08-21 完成。`PATCH /api/groups/order`（同 V11 语义）+ 管理页分组表 HTML5 拖拽。pytest 45 passed；Playwright 端到端：拖拽后顺序持久化。
 - ✅ V13（分组图标与配色）：2026-08-21 完成。内置 10 个线框图标（零外部依赖）+ 管理页图标选择 + 面板/访客稳定色相瓦片。pytest 48 passed；Playwright 端到端：图标保存并显示。
-- ⬜ V14–V50：待执行；每版独立提交。
+- ✅ V14（链接图标自动抓取）：2026-08-21 完成。`POST /api/links/{id}/fetch-icon` 受控抓取（`PANEL_LINK_ICON_FETCH` 开关、5s 超时、并发 ≤4、60s 缓存、≤1MB、类型白名单、HTML icon 解析 + /favicon.ico 回退、SSRF 仅 http/https）；管理页「抓图标」按钮；`/favicons/{name}` 严格文件名白名单。pytest 53 passed；本地 fixture + Playwright 端到端通过。
+- ⬜ V15–V50：待执行；每版独立提交。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

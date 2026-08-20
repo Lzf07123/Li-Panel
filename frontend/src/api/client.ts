@@ -143,6 +143,8 @@ export const linksApi = {
       method: "PATCH",
       body: JSON.stringify({ ordered_ids }),
     }),
+  fetchIcon: (id: number) =>
+    api<LinkOut>(`/api/links/${id}/fetch-icon`, { method: "POST" }),
 };
 
 export const settingsApi = {

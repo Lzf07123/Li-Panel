@@ -100,7 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa_fallback(path: str) -> FileResponse:
-        if path.startswith(("api/", "auth/", "go/", "uploads/")):
+        if path.startswith(("api/", "auth/", "go/", "uploads/", "favicons/")):
             raise HTTPException(status_code=404)
         candidate = FRONTEND_DIST / path
         if candidate.is_file():

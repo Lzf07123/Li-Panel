@@ -73,6 +73,7 @@
 - V11 链接拖拽排序：`PATCH /api/links/order`（提供 id 前置整体重排，重复 400 / 跨用户 404）；面板卡片 HTML5 组内拖拽，跨分组提示「仅同组生效」，保存失败回滚；`npx tsc --noEmit && npx vite build` 通过，pytest 40 passed，Playwright 组内拖拽端到端（PATCH 200 + 顺序持久化）通过
 - V12 分组拖拽排序：`PATCH /api/groups/order`（同 V11 整体重排语义）；管理页分组表拖拽行高亮；pytest 45 passed，Playwright 拖拽 常用→娱乐 后顺序持久化
 - V13 分组图标与配色：新增 `GroupIcon`（10 个内置线框图标，零外部依赖/不破坏 CSP）；管理页创建表单与表格行内图标选择，切换可见性不丢 icon；面板与访客视图分组标题显示稳定色相图标瓦片（无图标回退首字母）；pytest 48 passed，Playwright 设置→面板/访客显示通过
+- V14 链接图标自动抓取：新增 `app/favicon.py` 受控出站模块（`PANEL_LINK_ICON_FETCH`、5s 超时、BoundedSemaphore(4)、60s 内存缓存、1MB 上限、png/jpeg/webp/ico 白名单、HTML `<link rel=icon>` 解析与 `/favicon.ico` 回退、仅 http/https）；`POST /api/links/{id}/fetch-icon` 写回 `icon_type=upload`；`/favicons/{name}` 文件名正则白名单 + SPA fallback 排除；管理页「抓图标」按钮；pytest 53 passed（本地 fixture 服务器），Playwright 端到端通过
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

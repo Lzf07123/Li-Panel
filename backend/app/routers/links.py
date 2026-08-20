@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 from typing import Literal
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from app.db import get_db
 from app.deps import current_user
+from app.favicon import fetch_favicon, get_cached, set_cached
 
 router = APIRouter(prefix="/api/links", tags=["links"])
 
@@ -170,6 +172,44 @@ def update_link(
             body.open_mode,
             lid,
         ),
+    )
+    return _link_dict(_owned_link(conn, lid, user["id"]))
+
+
+@router.post("/{lid}/fetch-icon")
+def fetch_link_icon(
+    lid: int,
+    request: Request,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """抓取站点 favicon 并写回链接图标（受控出站：开关/超时/并发/缓存/白名单）。"""
+    settings = request.app.state.settings
+    if not settings.link_icon_fetch:
+        raise HTTPException(status_code=400, detail="图标抓取已关闭")
+    _owned_link(conn, lid, user["id"])
+    cached = get_cached(lid)
+    if cached is not None:
+        conn.execute(
+            "UPDATE links SET icon_type = 'upload', icon_value = ? WHERE id = ?",
+            (cached, lid),
+        )
+        return _link_dict(_owned_link(conn, lid, user["id"]))
+    row = _owned_link(conn, lid, user["id"])
+    url = row["url_wan"] or row["url_lan"]
+    data = fetch_favicon(url)
+    if data is None:
+        set_cached(lid, None)
+        raise HTTPException(status_code=404, detail="未找到站点图标")
+    name = f"link-{lid}-{secrets.token_hex(4)}.png"
+    favicons_dir = settings.data_dir / "favicons"
+    favicons_dir.mkdir(parents=True, exist_ok=True)
+    (favicons_dir / name).write_bytes(data)
+    path = f"/favicons/{name}"
+    set_cached(lid, path)
+    conn.execute(
+        "UPDATE links SET icon_type = 'upload', icon_value = ? WHERE id = ?",
+        (path, lid),
     )
     return _link_dict(_owned_link(conn, lid, user["id"]))
 

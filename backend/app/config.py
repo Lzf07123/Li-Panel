@@ -35,6 +35,7 @@ class Settings:
     oidc_client_id: str | None
     oidc_client_secret: str | None
     oidc_redirect_uri: str | None
+    link_icon_fetch: bool
 
     @property
     def db_path(self) -> Path:
@@ -79,4 +80,5 @@ def load_settings(overrides: dict | None = None) -> Settings:
         oidc_client_id=val("oidc_client_id", "OIDC_CLIENT_ID", None),
         oidc_client_secret=val("oidc_client_secret", "OIDC_CLIENT_SECRET", None),
         oidc_redirect_uri=val("oidc_redirect_uri", "OIDC_REDIRECT_URI", None),
+        link_icon_fetch=flag("link_icon_fetch", "PANEL_LINK_ICON_FETCH", True),
     )

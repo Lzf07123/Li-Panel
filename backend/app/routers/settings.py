@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
@@ -124,6 +125,16 @@ def upload_file(
     uploads_dir.mkdir(parents=True, exist_ok=True)
     (uploads_dir / name).write_bytes(data)
     return {"url": f"/uploads/{name}"}
+
+
+@router.get("/favicons/{name}")
+def favicon_file(request: Request, name: str) -> FileResponse:
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    path = request.app.state.settings.data_dir / "favicons" / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return FileResponse(path)
 
 
 @router.get("/uploads/{name}")

@@ -150,6 +150,15 @@ export function SettingsPage() {
     { onError: (err) => setError(err.message) },
   );
 
+  const fetchIconAction = useAsyncAction(
+    async (link: LinkOut) => {
+      await linksApi.fetchIcon(link.id);
+      setLinks(await linksApi.list());
+      toast.success(`「${link.name}」图标已抓取`);
+    },
+    { onError: (err) => setError(err.message) },
+  );
+
   const deleteGroupAction = useAsyncAction(
     async (id: number) => {
       await groupsApi.remove(id);
@@ -737,6 +746,14 @@ export function SettingsPage() {
                             </td>
                             <td className="whitespace-nowrap">
                               <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost h-8 px-3 text-xs"
+                                  disabled={fetchIconAction.status === "pending"}
+                                  onClick={() => void fetchIconAction.run(link)}
+                                >
+                                  抓图标
+                                </button>
                                 <button
                                   type="button"
                                   className="btn btn-ghost h-8 px-3 text-xs"
