@@ -38,3 +38,15 @@ def test_private_link_not_goable(client, auth_headers):
     )
     lid = r.json()["id"]
     assert client.get(f"/go/{lid}").status_code == 404
+
+
+def test_guest_panel_includes_group_icon(client, auth_headers):
+    client.post(
+        "/api/groups",
+        json={"name": "公开组", "icon": "star", "is_public": True},
+        headers=auth_headers,
+    )
+    client.post("/api/auth/logout")
+    r = client.get("/api/panel")
+    assert r.status_code == 200
+    assert r.json()["groups"][0]["icon"] == "star"

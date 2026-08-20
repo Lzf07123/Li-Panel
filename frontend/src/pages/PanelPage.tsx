@@ -9,7 +9,9 @@ import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
 import { DateTimeWidget } from "../components/DateTimeWidget";
+import { GroupIcon, isGroupIconName } from "../components/GroupIcon";
 import { LinkCard } from "../components/LinkCard";
+import { ACCENT_CLASSES, accentFor } from "../lib/accent";
 import { LinkPreviewModal } from "../components/LinkPreviewModal";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { SiteFooter } from "../components/SiteFooter";
@@ -475,7 +477,17 @@ export function PanelPage() {
                     )
                   }
                 >
-                  <span className="h-px w-4 bg-border" />
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
+                      ACCENT_CLASSES[accentFor(group.name)].tile
+                    }`}
+                  >
+                    {isGroupIconName(group.icon) ? (
+                      <GroupIcon name={group.icon} className="h-4 w-4" />
+                    ) : (
+                      group.name.trim().charAt(0).toUpperCase() || "?"
+                    )}
+                  </span>
                   {group.name}
                   <span className="text-xs font-normal text-muted/80">
                     · {group.links.length}

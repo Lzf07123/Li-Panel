@@ -108,9 +108,16 @@ export const panelApi = {
 
 export const groupsApi = {
   list: () => api<GroupOut[]>("/api/groups"),
-  create: (data: { name: string; is_public: boolean }) =>
-    api<GroupOut>("/api/groups", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: number, data: { name: string; is_public: boolean }) =>
+  create: (data: {
+    name: string;
+    is_public: boolean;
+    icon?: string | null;
+  }) => api<GroupOut>("/api/groups", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: number, data: {
+    name: string;
+    is_public: boolean;
+    icon?: string | null;
+  }) =>
     api<GroupOut>(`/api/groups/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),

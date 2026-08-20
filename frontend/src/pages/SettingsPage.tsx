@@ -12,6 +12,8 @@ import { SiteFooter } from "../components/SiteFooter";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useTheme } from "../hooks/useTheme";
 import { useToast } from "../hooks/useToast";
+import { GROUP_ICON_NAMES, GroupIcon, isGroupIconName } from "../components/GroupIcon";
+import type { GroupIconName } from "../components/GroupIcon";
 import { formatTags, parseTags } from "../lib/tags";
 
 type Tab = "site" | "manage" | "personal";
@@ -45,6 +47,7 @@ export function SettingsPage() {
   const [linkForm, setLinkForm] = useState(emptyLinkForm);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupPublic, setNewGroupPublic] = useState(false);
+  const [newGroupIcon, setNewGroupIcon] = useState<GroupIconName>("folder");
   const [error, setError] = useState("");
   const [deleteGroupId, setDeleteGroupId] = useState<number | null>(null);
   const [deleteLinkId, setDeleteLinkId] = useState<number | null>(null);
@@ -112,9 +115,11 @@ export function SettingsPage() {
     await groupsApi.create({
       name: newGroupName.trim(),
       is_public: newGroupPublic,
+      icon: newGroupIcon,
     });
     setNewGroupName("");
     setNewGroupPublic(false);
+    setNewGroupIcon("folder");
     setGroups(await groupsApi.list());
     toast.success("分组已创建");
   });
@@ -123,10 +128,24 @@ export function SettingsPage() {
     async (group: GroupOut) => {
       await groupsApi.update(group.id, {
         name: group.name,
+        icon: group.icon,
         is_public: !group.is_public,
       });
       setGroups(await groupsApi.list());
       toast.success(`「${group.name}」已${group.is_public ? "私密" : "公开"}`);
+    },
+    { onError: (err) => setError(err.message) },
+  );
+
+  const updateGroupIconAction = useAsyncAction(
+    async ({ group, icon }: { group: GroupOut; icon: string | null }) => {
+      await groupsApi.update(group.id, {
+        name: group.name,
+        icon,
+        is_public: group.is_public,
+      });
+      setGroups(await groupsApi.list());
+      toast.success(`「${group.name}」图标已更新`);
     },
     { onError: (err) => setError(err.message) },
   );
@@ -426,6 +445,22 @@ export function SettingsPage() {
                       required
                     />
                   </div>
+                  <div className="min-w-32">
+                    <span className="label">图标</span>
+                    <select
+                      className="input"
+                      value={newGroupIcon}
+                      onChange={(e) =>
+                        setNewGroupIcon(e.target.value as GroupIconName)
+                      }
+                    >
+                      {GROUP_ICON_NAMES.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <label className="flex cursor-pointer items-center gap-2 pb-2.5 text-sm text-foreground">
                     <input
                       type="checkbox"
@@ -451,6 +486,7 @@ export function SettingsPage() {
                       <thead>
                         <tr>
                           <th>名称</th>
+                          <th>图标</th>
                           <th>访客可见</th>
                           <th>操作</th>
                         </tr>
@@ -482,6 +518,27 @@ export function SettingsPage() {
                             }`}
                           >
                             <td className="min-w-36 font-medium">{group.name}</td>
+                            <td className="min-w-32">
+                              <select
+                                className="input input-sm"
+                                aria-label={`${group.name} 图标`}
+                                value={isGroupIconName(group.icon) ? group.icon : ""}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  void updateGroupIconAction.run({
+                                    group,
+                                    icon: value || null,
+                                  });
+                                }}
+                              >
+                                <option value="">默认</option>
+                                {GROUP_ICON_NAMES.map((name) => (
+                                  <option key={name} value={name}>
+                                    {name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
                             <td>
                               <span
                                 className={`badge ${
