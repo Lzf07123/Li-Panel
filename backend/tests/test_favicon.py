@@ -246,6 +246,48 @@ class _SmartHandler(BaseHTTPRequestHandler):
         elif self.mode == "svg":
             body = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>'
             ctype = "image/svg+xml"
+        elif self.mode == "manifest":
+            if self.path == "/manifest.json":
+                import json as _json
+
+                body = _json.dumps(
+                    {
+                        "name": "demo",
+                        "icons": [
+                            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                        ],
+                    }
+                ).encode()
+                ctype = "application/manifest+json"
+            elif self.path in ("/icon-192.png", "/icon-512.png"):
+                body, ctype = PNG_BYTES, "image/png"
+            else:
+                body = b'<html><head><link rel="manifest" href="/manifest.json"></head></html>'
+                ctype = "text/html"
+        elif self.mode == "og":
+            if self.path == "/og.png":
+                body, ctype = PNG_BYTES, "image/png"
+            else:
+                body = b'<html><head><meta property="og:image" content="/og.png"></head></html>'
+                ctype = "text/html"
+        elif self.mode == "ms":
+            if self.path == "/tile.png":
+                body, ctype = PNG_BYTES, "image/png"
+            else:
+                body = b'<html><head><meta name="msapplication-TileImage" content="/tile.png"></head></html>'
+                ctype = "text/html"
+        elif self.mode == "rootpng":
+            if self.path == "/favicon.png":
+                body, ctype = PNG_BYTES, "image/png"
+            else:
+                body = b"<html><head></head></html>"
+                ctype = "text/html"
+        elif self.mode == "svgdata":
+            body = (
+                b"<html><head><link rel='icon' href='data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3C/svg%3E'></head></html>"
+            )
+            ctype = "text/html"
         else:
             body, ctype = PNG_BYTES, "image/png"
         self.send_response(200)
@@ -292,7 +334,7 @@ def test_icon_size_preference(client, auth_headers, smart_server):
 
 
 def test_icon_size_preference_unit():
-    from app.favicon import _pick_icon_url
+    from app.favicon import _pick_link_icon_url
 
     html = (
         '<html><head>'
@@ -300,14 +342,14 @@ def test_icon_size_preference_unit():
         '<link rel="icon" href="/icon-64.png" sizes="64x64">'
         '</head></html>'
     )
-    assert _pick_icon_url(html, "http://x.example/") == "http://x.example/icon-64.png"
+    assert _pick_link_icon_url(html, "http://x.example/") == "http://x.example/icon-64.png"
 
 
 def test_icon_base_href_unit():
-    from app.favicon import _pick_icon_url
+    from app.favicon import _pick_link_icon_url
 
     html = '<html><head><base href="https://cdn.example/assets/"><link rel="icon" href="fav.png"></head></html>'
-    assert _pick_icon_url(html, "http://x.example/") == "https://cdn.example/assets/fav.png"
+    assert _pick_link_icon_url(html, "http://x.example/") == "https://cdn.example/assets/fav.png"
 
 
 def test_icon_data_uri(client, auth_headers, smart_server):
@@ -329,3 +371,63 @@ def test_icon_svg_content_type(client, auth_headers, smart_server):
     resp = client.get(icon)
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
+
+
+def test_manifest_icons(client, auth_headers, smart_server):
+    _SmartHandler.mode = "manifest"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_og_image_fallback(client, auth_headers, smart_server):
+    _SmartHandler.mode = "og"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_msapplication_tile(client, auth_headers, smart_server):
+    _SmartHandler.mode = "ms"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_root_favicon_png_fallback(client, auth_headers, smart_server):
+    _SmartHandler.mode = "rootpng"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_inline_svg_data_uri(client, auth_headers, smart_server):
+    _SmartHandler.mode = "svgdata"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert icon.endswith(".svg")
+    assert client.get(icon).status_code == 200
+
+
+def test_size_first_scoring_unit():
+    from app.favicon import _pick_link_icon_url
+
+    html = (
+        '<html><head>'
+        '<link rel="apple-touch-icon" href="/apple-180.png" sizes="180x180">'
+        '<link rel="icon" href="/icon-512.png" sizes="512x512">'
+        '</head></html>'
+    )
+    assert _pick_link_icon_url(html, "http://x.example/") == "http://x.example/icon-512.png"
+    html2 = (
+        '<html><head>'
+        '<link rel="apple-touch-icon" href="/apple-180.png" sizes="180x180">'
+        '<link rel="icon" href="/icon-16.png" sizes="16x16">'
+        '</head></html>'
+    )
+    assert _pick_link_icon_url(html2, "http://x.example/") == "http://x.example/apple-180.png"
+
+
+def test_twitter_image_fallback(client, auth_headers, smart_server):
+    _SmartHandler.mode = "twitter"
+    # twitter 模式由当前 handler 未定义 → 走 og 分支同源，这里验证 meta 名采集单元
+    from app.favicon import _candidate_urls
+
+    html = '<html><head><meta name="twitter:image:src" content="/tw.png"></head></html>'
+    candidates = _candidate_urls(html, "http://x.example/")
+    assert any("tw.png" in c for c in candidates)

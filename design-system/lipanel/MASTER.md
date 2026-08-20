@@ -49,6 +49,15 @@
 - 延迟显示紧贴状态点：状态点与延迟文本间距统一 4px，文本左对齐紧邻圆点（`min-w-12` + `tabular-nums` 保持各卡片对齐）
 - 验证：pytest 163 passed（新增 7 项识别测试：回退/择优/base/data URI/apple-touch/SVG）；Playwright 端到端——延迟间隙 4px 一致、自动抓取生成 `/favicons/link-*`
 
+2026-08-21 图标识别增强（第二轮，覆盖全部常见类型）：
+
+- `<link rel="manifest">`：解析 Web App Manifest `icons[]`（purpose any 优先于 maskable、sizes 择优，512KB 上限）
+- `<meta>` 图标：`msapplication-TileImage`、`og:image`、`twitter:image` / `twitter:image:src`
+- 根目录回退链：`/favicon.ico` → `/favicon.png` → `/favicon.svg`
+- 内联 data: URI：base64（png/jpeg/webp/svg/x-icon）+ 非 base64 内联 SVG
+- 评分改为 sizes 优先（512 图标胜过 180 apple-touch）、apple-touch 次之；候选按优先级链尝试（深度上限 3）
+- 验证：pytest 170 passed（favicon 22 项，新增 manifest/og/msapplication/根目录 png/内联 SVG/评分）；Playwright 端到端 manifest 自动抓取通过
+
 2026-08-21 面板重复分组与健康检测触发修复：
 
 - 备份导入/恢复按分组名（大小写不敏感）合并复用，不再创建同名重复分组；链接仍按追加语义进入对应分组（`backend/app/routers/backup.py`）
