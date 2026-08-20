@@ -14,7 +14,7 @@ import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useTheme } from "../hooks/useTheme";
 import { useI18n, type Lang } from "../lib/i18n";
 import { useToast } from "../hooks/useToast";
-import { GROUP_ICON_NAMES, GroupIcon, isGroupIconName } from "../components/GroupIcon";
+import { GROUP_ICON_NAMES, isGroupIconName } from "../components/GroupIcon";
 import type { GroupIconName } from "../components/GroupIcon";
 import { formatTags, parseTags } from "../lib/tags";
 
@@ -529,7 +529,7 @@ export function SettingsPage() {
                     icp: site.icp,
                     public_mode: site.public_mode === "true",
                     notify_url: site.notify_url,
-                    notify_enabled: site.notify_enabled === "true",
+                    notify_enabled: site.notify_enabled,
                   });
                 }}
                 className="card space-y-4 p-6 sm:p-8"
@@ -1364,7 +1364,7 @@ export function SettingsPage() {
                   {me.sso.bound ? (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <p className="text-sm text-muted">
-                        {t("已绑定：{provider}（{email}）", { provider: me.sso.provider, email: me.sso.email ?? "" })}
+                        {t("已绑定：{provider}（{email}）", { provider: me.sso.provider ?? "", email: me.sso.email ?? "" })}
                       </p>
                       <button
                         type="button"

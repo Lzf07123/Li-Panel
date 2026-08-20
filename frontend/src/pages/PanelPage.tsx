@@ -744,7 +744,6 @@ export function PanelPage() {
       <HealthTrendModal
         link={trendLink}
         onClose={() => setTrendLink(null)}
-        onOpenModal={setPreviewLink}
       />
     </div>
   );

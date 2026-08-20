@@ -8,11 +8,9 @@ import { Notice } from "../components/Notice";
 import { PasswordInput } from "../components/PasswordInput";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useToast } from "../hooks/useToast";
-import { useI18n } from "../lib/i18n";
 
 export function SetupPage() {
   const [username, setUsername] = useState("");
-  const { t } = useI18n();
   const [password, setPassword] = useState("");
   const [ready, setReady] = useState(false);
   const toast = useToast();

@@ -8,13 +8,11 @@ import { Notice } from "../components/Notice";
 import { PasswordInput } from "../components/PasswordInput";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useToast } from "../hooks/useToast";
-import { useI18n } from "../lib/i18n";
 
 type Action = "bind" | "create";
 
 export function SsoLinkPage() {
   const [action, setAction] = useState<Action>("bind");
-  const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [identity, setIdentity] = useState<{

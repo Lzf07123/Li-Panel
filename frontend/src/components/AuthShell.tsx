@@ -9,7 +9,6 @@ import { Brand } from "./Brand";
 import { FloatingBackground } from "./FloatingBackground";
 import { SiteFooter } from "./SiteFooter";
 import { ThemeToggle } from "./ThemeToggle";
-import { useI18n } from "../lib/i18n";
 import { TechAmbience } from "./bits/TechAmbience";
 
 export function AuthShell({
@@ -26,7 +25,6 @@ export function AuthShell({
 }) {
   // 表单聚焦时减速：让“环境呼吸”在用户输入时退为背景音，失焦后恢复
   const [focusing, setFocusing] = useState(false);
-  const { t } = useI18n();
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">

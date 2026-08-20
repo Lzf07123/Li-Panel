@@ -174,5 +174,11 @@
 - ✅ V42（离线缓存外壳）：2026-08-21 完成。`public/sw.js`（/assets 缓存优先、导航网络优先失败回退首页、API/auth 不缓存、版本化清理）+ 生产构建注册。构建产物含 sw.js。
 - ✅ V43（i18n 框架）：2026-08-21 完成。`src/lib/i18n.ts`（中文原文即 key、en-US 字典、`{param}` 插值、`useI18n`）+ `src/locales/en-US.ts`；面板/设置/登录/命令面板/状态趋势等主要页面文案迁移（品牌与配置项文案保留原文，作为配置驱动字段豁免）。
 - ✅ V44（语言偏好）：2026-08-21 完成。个人设置页语言选择（中文/English），localStorage + 后端用户设置 `lang` 双持久化，`document.documentElement.lang` 同步；浏览器偏好回退。pytest 149 passed；Playwright 端到端：切 English 后面板显示 Welcome/Manage/Sign out。
-- ⬜ V45–V50：待执行。
+- ✅ V45（静态资源长期缓存）：2026-08-21 完成。`/assets/*` `Cache-Control: public, max-age=31536000, immutable`；API 保持 no-store；响应头 `X-Panel-Version`。pytest 通过。
+- ✅ V46（版本信息）：2026-08-21 完成。`app/version.py` 单一事实来源；`/api/health` 返回 `version`；页脚显示版本；`docs/CHANGELOG.md`。
+- ✅ V47（部署加固文档）：2026-08-21 完成。README 增加镜像钉扎/反代 HTTPS/Host 白名单/备份恢复演练/`PANEL_SECRET_KEY` 轮换。
+- ✅ V48（前端测试补齐）：2026-08-21 完成。vitest 13 passed（i18n/标签解析/强调色稳定/折叠持久化/最近使用）。
+- ✅ V49（端到端冒烟脚本）：2026-08-21 完成。`scripts/smoke.sh` 干净数据目录全流程 PASS（初始化→登录→建分组/链接→可见性→导出→导入→访客可见性）。
+- ✅ V50（性能与内存回归）：2026-08-21 完成。`scripts/check-size.sh` 构建体积 543,500B（预算 2MB）PASS；pytest 151 passed；`npm run build`（tsc -b + vite + precompress）通过；容器实测 health `{"status":"ok","version":"0.1.0"}`、`docker stats` 46.5MiB / 3 进程（≤90MB 达标）。
+- ✅ **Phase E（V41–V50）全部完成，V11–V50 全量完成**：2026-08-21，提交范围见 git log。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

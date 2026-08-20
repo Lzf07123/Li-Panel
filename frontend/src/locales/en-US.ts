@@ -106,7 +106,6 @@ export const enUS: Record<string, string> = {
   "还没有历史数据，状态检查后会自动采样。": "No history yet; it will be sampled after checks.",
   // 设置
   "站点信息": "Site",
-  "快捷方式": "Shortcuts",
   "标签管理": "Tags",
   "个人设置": "Profile",
   "站点名称": "Site name",
@@ -132,7 +131,6 @@ export const enUS: Record<string, string> = {
   "公网地址（可选）": "WAN URL (optional)",
   "描述（可选）": "Description (optional)",
   "标签，用逗号分隔（最多 8 个）": "Tags, comma separated (max 8)",
-  "公开": "Public",
   "访客隐藏 URL（/go 跳转）": "Hide URL from guests (/go redirect)",
   "访客直接显示 URL": "Show URL to guests",
   "新标签页打开": "Open in new tab",
