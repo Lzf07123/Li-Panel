@@ -13,6 +13,7 @@ import { GroupIcon, isGroupIconName } from "../components/GroupIcon";
 import { LinkCard } from "../components/LinkCard";
 import { ACCENT_CLASSES, accentFor } from "../lib/accent";
 import { LinkPreviewModal } from "../components/LinkPreviewModal";
+import { HealthTrendModal } from "../components/HealthTrendModal";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { SiteFooter } from "../components/SiteFooter";
 import { AuroraBackground } from "../components/bits/AuroraBackground";
@@ -41,6 +42,7 @@ export function PanelPage() {
   const [recents, setRecents] = useState<RecentItem[]>(getRecent);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [previewLink, setPreviewLink] = useState<LinkOut | null>(null);
+  const [trendLink, setTrendLink] = useState<LinkOut | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(
     loadCollapsedGroups,
   );
@@ -545,6 +547,7 @@ export function PanelPage() {
                         isDragOver={dragOverId === link.id}
                         status={linkHealth[link.id]?.status}
                         statusMs={linkHealth[link.id]?.ms}
+                        onStatusClick={setTrendLink}
                         onDragStart={(link) => setDragId(link.id)}
                         onDragOver={(link) => setDragOverId(link.id)}
                         onDrop={handleDrop}
@@ -580,6 +583,7 @@ export function PanelPage() {
                     isDragOver={dragOverId === link.id}
                     status={linkHealth[link.id]?.status}
                     statusMs={linkHealth[link.id]?.ms}
+                    onStatusClick={setTrendLink}
                     onDragStart={(link) => setDragId(link.id)}
                     onDragOver={(link) => setDragOverId(link.id)}
                     onDrop={handleDrop}
@@ -599,6 +603,11 @@ export function PanelPage() {
         loggedIn={Boolean(me)}
       />
       <LinkPreviewModal link={previewLink} onClose={() => setPreviewLink(null)} />
+      <HealthTrendModal
+        link={trendLink}
+        onClose={() => setTrendLink(null)}
+        onOpenModal={setPreviewLink}
+      />
     </div>
   );
 }

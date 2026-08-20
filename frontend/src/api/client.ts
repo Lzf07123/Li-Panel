@@ -118,6 +118,10 @@ export const healthApi = {
       enabled: boolean;
       results: { link_id: number; status: "up" | "down"; ms: number; checked_at: string }[];
     }>("/api/health/links"),
+  history: (linkId: number) =>
+    api<
+      { status: "up" | "down"; ms: number; checked_at: string }[]
+    >(`/api/health/links/${linkId}/history`),
 };
 
 export const panelApi = {

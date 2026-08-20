@@ -137,3 +137,87 @@ def test_health_isolation(client, auth_headers, health_server):
 
 def test_health_requires_auth(client):
     assert client.get("/api/health/links").status_code == 401
+
+
+def test_history_records_sample(client, auth_headers, health_server):
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    client.get("/api/health/links", headers=auth_headers)
+    links = client.get("/api/links", headers=auth_headers).json()
+    lid = links[0]["id"]
+    history = client.get(f"/api/health/links/{lid}/history", headers=auth_headers)
+    assert history.status_code == 200
+    assert len(history.json()) == 1
+    assert history.json()[0]["status"] == "up"
+
+
+def test_history_sample_interval_skips(client, auth_headers, health_server):
+    from app import health as health_module
+
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    client.get("/api/health/links", headers=auth_headers)
+    with health_module._cache_lock:
+        health_module._cache.clear()
+    client.get("/api/health/links", headers=auth_headers)
+    lid = client.get("/api/links", headers=auth_headers).json()[0]["id"]
+    history = client.get(f"/api/health/links/{lid}/history", headers=auth_headers).json()
+    assert len(history) == 1  # 10 分钟内不重复采样
+
+
+def test_history_old_sample_inserts(client, auth_headers, health_server):
+    from app import health as health_module
+    from app.db import connect
+    from datetime import datetime, timedelta, timezone
+
+    lid = client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    ).json()["id"]
+    conn = connect(client.app.state.db_path)
+    old = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    conn.execute(
+        "INSERT INTO link_health (link_id, user_id, status, ms, checked_at) "
+        "VALUES (?, 1, 'down', 0, ?)",
+        (lid, old),
+    )
+    conn.commit()
+    conn.close()
+    with health_module._cache_lock:
+        health_module._cache.clear()
+    client.get("/api/health/links", headers=auth_headers)
+    history = client.get(f"/api/health/links/{lid}/history", headers=auth_headers).json()
+    assert len(history) == 2
+
+
+def test_history_foreign_404(client, auth_headers, health_server):
+    from app.db import connect
+    from app.security import hash_password
+
+    lid = client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    ).json()["id"]
+    conn = connect(client.app.state.db_path)
+    ph, salt = hash_password("secret123")
+    conn.execute(
+        "INSERT INTO users (username, password_hash, salt, role) VALUES ('user_b', ?, ?, 'user')",
+        (ph, salt),
+    )
+    conn.commit()
+    conn.close()
+    b = client.post(
+        "/api/auth/login", json={"username": "user_b", "password": "secret123"}
+    )
+    bh = {"Cookie": f"lipanel_session={b.cookies['lipanel_session']}"}
+    assert client.get(f"/api/health/links/{lid}/history", headers=bh).status_code == 404

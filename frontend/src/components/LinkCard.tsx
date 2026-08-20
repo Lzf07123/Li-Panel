@@ -11,6 +11,7 @@ export function LinkCard({
   isDragOver = false,
   status,
   statusMs,
+  onStatusClick,
   onDragStart,
   onDragOver,
   onDrop,
@@ -24,6 +25,7 @@ export function LinkCard({
   isDragOver?: boolean;
   status?: "up" | "down" | "unknown";
   statusMs?: number | null;
+  onStatusClick?: (link: LinkOut) => void;
   onDragStart?: (link: LinkOut) => void;
   onDragOver?: (link: LinkOut) => void;
   onDrop?: (link: LinkOut) => void;
@@ -108,7 +110,8 @@ export function LinkCard({
       </span>
       {status ? (
         <span
-          role="img"
+          role="button"
+          tabIndex={-1}
           aria-label={
             status === "up"
               ? "在线"
@@ -118,11 +121,16 @@ export function LinkCard({
           }
           title={
             status === "up"
-              ? `在线${statusMs != null ? ` · ${statusMs}ms` : ""}`
+              ? `在线${statusMs != null ? ` · ${statusMs}ms` : ""}（点击查看趋势）`
               : status === "down"
-                ? "离线"
+                ? "离线（点击查看趋势）"
                 : "状态未知"
           }
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onStatusClick?.(link);
+          }}
           className={`status-dot shrink-0 ${
             status === "up"
               ? "status-dot-up"

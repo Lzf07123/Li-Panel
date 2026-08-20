@@ -82,6 +82,7 @@
 - V20 恢复向导：`GET /api/backup/snapshots`（管理员，快照预览条数）、`POST /api/backup/restore/{name}`（文件名白名单、快照行按 user_id 过滤后追加导入、管理员含 site_settings）；个人设置页自动快照列表 + 恢复确认弹窗；pytest 83 passed，Playwright 快照列表→恢复→追加导入端到端通过
 - V21 链接健康检查引擎：`app/health.py` 受控出站（`PANEL_HEALTH_CHECK`、HEAD 优先 405/501 回退 GET、5s 超时、BoundedSemaphore(4)、60s 缓存、<500 up）；`GET /api/health/links` 仅返回本人链接状态；pytest 89 passed（本地 fixture up/down/缓存/关闭/隔离）
 - V22 卡片状态点：`.status-dot-up/down` 语义色（复用 success/destructive 令牌）；`LinkCard` 状态点 + hover 毫秒 title；健康检查改为 ThreadPoolExecutor≤4 并发（面板秒级返回）；`connect(..., timeout=10)` + `PRAGMA busy_timeout=10000`；pytest 89 passed，Playwright 44 链接状态点全部渲染
+- V23 状态历史：`link_health` 表（每链接 10 分钟采样、24h/144 条滚动清理、跨用户隔离）；`GET /api/health/links/{id}/history`（404 防越权）；`HealthTrendModal` 趋势条弹层（绿/红 + 图例）；pytest 93 passed，Playwright 点状态点弹历史弹层通过
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
