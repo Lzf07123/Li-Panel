@@ -64,6 +64,7 @@ export function SsoLinkPage() {
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
+            aria-pressed={action === "bind"}
             className={`btn ${action === "bind" ? "btn-primary" : "btn-secondary"}`}
             onClick={() => setAction("bind")}
           >
@@ -71,6 +72,7 @@ export function SsoLinkPage() {
           </button>
           <button
             type="button"
+            aria-pressed={action === "create"}
             className={`btn ${action === "create" ? "btn-primary" : "btn-secondary"}`}
             onClick={() => setAction("create")}
           >

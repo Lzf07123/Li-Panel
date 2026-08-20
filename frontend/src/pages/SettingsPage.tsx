@@ -932,6 +932,7 @@ export function SettingsPage() {
                               <div className="flex gap-2">
                                 <button
                                   type="button"
+                                  aria-pressed={group.is_public}
                                   className="btn btn-ghost h-8 px-3 text-xs"
                                   onClick={() => void toggleGroupAction.run(group)}
                                 >
@@ -1309,6 +1310,7 @@ export function SettingsPage() {
                                 </button>
                                 <button
                                   type="button"
+                                  aria-pressed={link.is_public}
                                   className="btn btn-ghost h-8 px-3 text-xs"
                                   onClick={() => void toggleLinkAction.run(link)}
                                 >

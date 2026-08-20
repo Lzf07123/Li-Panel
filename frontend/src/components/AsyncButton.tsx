@@ -25,6 +25,7 @@ export function AsyncButton({
   children,
   disabled,
   className = "",
+  type = "button",
   ...rest
 }: AsyncButtonProps) {
   const label =
@@ -37,6 +38,7 @@ export function AsyncButton({
   return (
     <button
       {...rest}
+      type={type}
       disabled={disabled || status === "pending" || status === "success"}
       aria-busy={status === "pending" || undefined}
       className={`${className} ${STATUS_CLASS[status]}`.trim()}

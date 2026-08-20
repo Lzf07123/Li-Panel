@@ -11,6 +11,7 @@
 - **页脚重复版权**：`footer_text` 默认改为空（前端固定渲染 `© 年 品牌 · v版本`），启动时自动清理旧库遗留的 `© 2026` 重复值。
 - **备案信息优先级**：备案字段（ICP/公安）优先读取构建期环境变量 `VITE_ICP_*`/`VITE_POLICE_*`；后台修改对应字段时页面给出提醒（不生效，需清除变量后重新构建）。
 - **版权行可配置**：站点设置新增 `copyright`，页脚「© 年份 名称 · v版本」可在后台修改；留空时自动生成（持有人跟随站点名称）。
+- **按钮语义增强**：`AsyncButton` 默认显式 `type=button`；链接卡片状态点键盘可达（Enter/空格，`aria-haspopup`）；SSO 绑定/新建与可见性切换按钮补 `aria-pressed`；命令面板输入框与选项列表 `aria-controls`/`aria-activedescendant` 联动。
 - 验证：pytest 177 passed（新增 6 项回归）；tsc/vite build/vitest 13 passed；镜像重建后健康检查、`docker stats` 46.66MiB、gzip 压缩、冒烟 PASS。
 
 ### 50 版本迭代（V01–V50 全量完成）

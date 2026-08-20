@@ -114,7 +114,7 @@ export function LinkCard({
         <span className="ml-auto flex shrink-0 items-center gap-1">
           <span
             role="button"
-            tabIndex={-1}
+            tabIndex={0}
             aria-label={
               status === "up"
                 ? t("在线")
@@ -122,6 +122,7 @@ export function LinkCard({
                   ? t("离线")
                   : t("状态未知")
             }
+            aria-haspopup="dialog"
             title={
               status === "up"
                 ? t("在线 · {ms}ms", { ms: statusMs ?? "" }) +
@@ -134,6 +135,13 @@ export function LinkCard({
               event.preventDefault();
               event.stopPropagation();
               onStatusClick?.(link);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                onStatusClick?.(link);
+              }
             }}
             className={`status-dot shrink-0 ${
               status === "up"

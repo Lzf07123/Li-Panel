@@ -135,6 +135,10 @@ export function CommandPalette({
         className="input"
         placeholder={t("搜索快捷方式或输入命令…")}
         aria-label={t("搜索")}
+        aria-controls="command-palette-list"
+        aria-activedescendant={
+          items.length > 0 ? `command-palette-option-${active}` : undefined
+        }
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -157,12 +161,18 @@ export function CommandPalette({
         <p className="mt-4 text-sm text-muted">{t("没有匹配结果")}</p>
       ) : (
         <ul
+          id="command-palette-list"
           role="listbox"
           aria-label="搜索结果"
           className="mt-3 max-h-72 overflow-y-auto space-y-1"
         >
           {items.map((item, index) => (
-            <li key={item.key} role="option" aria-selected={index === active}>
+            <li
+              key={item.key}
+              id={`command-palette-option-${index}`}
+              role="option"
+              aria-selected={index === active}
+            >
               <button
                 type="button"
                 className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
