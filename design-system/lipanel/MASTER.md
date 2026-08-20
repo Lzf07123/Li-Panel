@@ -70,6 +70,12 @@
 - 备案图标预留占位：图标路径缺失或加载失败时显示「备 / 公」字形方块（`.filing-icon-placeholder`），不再出现破图
 - `.env.example` 补充前端备案变量（VITE_ICP_*/VITE_POLICE_*）；Playwright 验证：缺失图标→占位「备」、真实图标正常渲染、链接/标题正确
 
+2026-08-21 备案信息接入后台配置（运行时同步）：
+
+- `site_settings` 新增 `icp_url/icp_icon/police_text/police_url/police_icon`（默认值见 `brand_defaults.py`）；设置页「站点信息」新增备案链接/图标、公安备案号/链接/图标字段
+- 页脚改为运行时读取 `/api/panel` 下发的 `site` 配置（`SiteFooter site` 属性），未提供时回退 `brand.ts` 默认值；`footer_text` 同步展示
+- 验证：pytest 171 passed；Playwright 端到端——后台写入备案 → 页脚立即显示；设置页修改公安备案号 → 保存后面板页脚同步新值
+
 2026-08-21 面板重复分组与健康检测触发修复：
 
 - 备份导入/恢复按分组名（大小写不敏感）合并复用，不再创建同名重复分组；链接仍按追加语义进入对应分组（`backend/app/routers/backup.py`）

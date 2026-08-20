@@ -550,6 +550,11 @@ export function SettingsPage() {
                     favicon: site.favicon,
                     footer_text: site.footer_text,
                     icp: site.icp,
+                    icp_url: site.icp_url,
+                    icp_icon: site.icp_icon,
+                    police_text: site.police_text,
+                    police_url: site.police_url,
+                    police_icon: site.police_icon,
                     public_mode: site.public_mode === "true",
                     notify_url: site.notify_url,
                     notify_enabled: site.notify_enabled,
@@ -646,6 +651,55 @@ export function SettingsPage() {
                       className="input"
                       value={site.icp}
                       onChange={(e) => setSite({ ...site, icp: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">{t("备案链接")}</span>
+                    <input
+                      className="input"
+                      value={site.icp_url}
+                      onChange={(e) => setSite({ ...site, icp_url: e.target.value })}
+                      placeholder="https://beian.miit.gov.cn/"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">{t("备案图标")}</span>
+                    <input
+                      className="input"
+                      value={site.icp_icon}
+                      onChange={(e) => setSite({ ...site, icp_icon: e.target.value })}
+                      placeholder="/badges/icp.webp"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">{t("公安备案号")}</span>
+                    <input
+                      className="input"
+                      value={site.police_text}
+                      onChange={(e) =>
+                        setSite({ ...site, police_text: e.target.value })
+                      }
+                      placeholder="如：京公网安备 11000000000000 号"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">{t("公安备案链接")}</span>
+                    <input
+                      className="input"
+                      value={site.police_url}
+                      onChange={(e) => setSite({ ...site, police_url: e.target.value })}
+                      placeholder="https://beian.mps.gov.cn/"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">{t("公安备案图标")}</span>
+                    <input
+                      className="input"
+                      value={site.police_icon}
+                      onChange={(e) =>
+                        setSite({ ...site, police_icon: e.target.value })
+                      }
+                      placeholder="/badges/police.webp"
                     />
                   </label>
                 </div>
@@ -1548,7 +1602,7 @@ export function SettingsPage() {
             ) : null}
           </div>
         </main>
-        <SiteFooter />
+        <SiteFooter site={site} />
       </div>
 
       <ConfirmDialog

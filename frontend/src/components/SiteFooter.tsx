@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import type { SiteSettings } from "../api/types";
 import {
   APP_VERSION,
   CONTACT_EMAIL,
@@ -57,27 +58,28 @@ function FilingLink({
   );
 }
 
-function FilingLinks() {
+function FilingLinks({
+  site,
+}: {
+  site?: SiteSettings | null;
+}) {
+  // 运行时以后台 site_settings 为事实来源，未配置时回退品牌默认值
   const entries = [
-    ICP_FILING_TEXT
-      ? {
-          key: "icp",
-          text: ICP_FILING_TEXT,
-          href: ICP_FILING_URL,
-          icon: ICP_FILING_ICON,
-          placeholder: "备",
-        }
-      : null,
-    POLICE_FILING_TEXT
-      ? {
-          key: "police",
-          text: POLICE_FILING_TEXT,
-          href: POLICE_FILING_URL,
-          icon: POLICE_FILING_ICON,
-          placeholder: "公",
-        }
-      : null,
-  ].filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+    {
+      key: "icp",
+      text: site?.icp ?? ICP_FILING_TEXT,
+      href: site?.icp_url ?? ICP_FILING_URL,
+      icon: site?.icp_icon ?? ICP_FILING_ICON,
+      placeholder: "备",
+    },
+    {
+      key: "police",
+      text: site?.police_text ?? POLICE_FILING_TEXT,
+      href: site?.police_url ?? POLICE_FILING_URL,
+      icon: site?.police_icon ?? POLICE_FILING_ICON,
+      placeholder: "公",
+    },
+  ].filter((entry) => entry.text !== "");
 
   if (entries.length === 0) return null;
   return (
@@ -128,14 +130,21 @@ function FooterLink({ label, href }: { label: string; href: string }) {
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({
+  site,
+}: {
+  site?: SiteSettings | null;
+}) {
   const year = new Date().getFullYear();
 
   return (
     <footer className="relative mt-auto border-t border-border/60 bg-surface/60 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-5 text-xs text-muted lg:px-8">
         <span>© {year} {COPYRIGHT_HOLDER} · v{APP_VERSION}</span>
-        <FilingLinks />
+        {site?.footer_text ? (
+          <span className="whitespace-nowrap">{site.footer_text}</span>
+        ) : null}
+        <FilingLinks site={site} />
         {FOOTER_LINKS.map((link) => (
           <FooterLink key={link.label} label={link.label} href={link.href} />
         ))}

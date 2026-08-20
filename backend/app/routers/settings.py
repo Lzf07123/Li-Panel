@@ -29,6 +29,11 @@ SITE_KEYS = {
     "favicon",
     "footer_text",
     "icp",
+    "icp_url",
+    "icp_icon",
+    "police_text",
+    "police_url",
+    "police_icon",
     "public_mode",
     "notify_url",
     "notify_enabled",
@@ -47,6 +52,11 @@ class SiteSettingsIn(BaseModel):
     favicon: str | None = Field(default=None, max_length=500)
     footer_text: str | None = Field(default=None, max_length=200)
     icp: str | None = Field(default=None, max_length=100)
+    icp_url: str | None = Field(default=None, max_length=500)
+    icp_icon: str | None = Field(default=None, max_length=500)
+    police_text: str | None = Field(default=None, max_length=100)
+    police_url: str | None = Field(default=None, max_length=500)
+    police_icon: str | None = Field(default=None, max_length=500)
     public_mode: bool | None = None
     notify_url: str | None = Field(default=None, max_length=500)
     notify_enabled: bool | None = None

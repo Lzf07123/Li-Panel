@@ -54,3 +54,24 @@ def test_user_lang_roundtrip(client, auth_headers):
     assert client.get("/api/settings", headers=auth_headers).json()["lang"] == "en-US"
     r2 = client.put("/api/settings", json={"lang": "fr-FR"}, headers=auth_headers)
     assert r2.status_code == 422
+
+
+def test_filing_settings_roundtrip(client, auth_headers):
+    payload = {
+        "icp": "浙ICP备20261234567号-1",
+        "icp_url": "https://beian.miit.gov.cn/",
+        "icp_icon": "/badges/icp.webp",
+        "police_text": "浙公网安备 33010000012345 号",
+        "police_url": "https://beian.mps.gov.cn/",
+        "police_icon": "/badges/police.webp",
+    }
+    r = client.put("/api/site-settings", json=payload, headers=auth_headers)
+    assert r.status_code == 200
+    saved = r.json()
+    assert saved["icp"] == payload["icp"]
+    assert saved["police_text"] == payload["police_text"]
+    assert saved["police_url"] == payload["police_url"]
+    # 面板接口同样下发
+    panel = client.get("/api/panel", headers=auth_headers).json()
+    assert panel["site"]["icp"] == payload["icp"]
+    assert panel["site"]["police_text"] == payload["police_text"]

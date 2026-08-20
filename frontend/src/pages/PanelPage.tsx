@@ -748,7 +748,7 @@ export function PanelPage() {
             </section>
           ) : null}
         </main>
-        <SiteFooter />
+        <SiteFooter site={site} />
       </div>
       <CommandPalette
         open={paletteOpen}

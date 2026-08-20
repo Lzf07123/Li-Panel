@@ -21,6 +21,11 @@ export interface SiteSettings {
   favicon: string;
   footer_text: string;
   icp: string;
+  icp_url: string;
+  icp_icon: string;
+  police_text: string;
+  police_url: string;
+  police_icon: string;
   public_mode: string;
   notify_url: string;
   notify_enabled: string;
