@@ -58,6 +58,12 @@
 - 评分改为 sizes 优先（512 图标胜过 180 apple-touch）、apple-touch 次之；候选按优先级链尝试（深度上限 3）
 - 验证：pytest 170 passed（favicon 22 项，新增 manifest/og/msapplication/根目录 png/内联 SVG/评分）；Playwright 端到端 manifest 自动抓取通过
 
+2026-08-21 消息弹窗完善与 nginx 反代编排：
+
+- 消息弹窗新增 `loading` 通知类型（旋转图标、默认常驻由调用方关闭）；默认标题与「关闭通知」接入 i18n；最大堆叠 5 条自动裁剪；hover 暂停进度已有，补齐 loading 样式
+- 编排改为 nginx 反代：`nginx/nginx.conf` 监听 80 反代 `lipanel:8000`，compose 仅 `lipanel-nginx` 发布 `PANEL_PORT:80`，后端真实端口不再映射到宿主机；代理头/上传上限 10m/gzip；README 增补反代说明
+- 验证：`docker compose up` 后 `curl localhost:8000/api/health` 返回 ok；`docker ps` 仅 nginx 发布端口；SPA 经反代 200
+
 2026-08-21 面板重复分组与健康检测触发修复：
 
 - 备份导入/恢复按分组名（大小写不敏感）合并复用，不再创建同名重复分组；链接仍按追加语义进入对应分组（`backend/app/routers/backup.py`）

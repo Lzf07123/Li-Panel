@@ -70,6 +70,13 @@ docker compose up -d --build
 2. `.env` 中填写 `OIDC_ENABLED=true`、`OIDC_ISSUER`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`（机密客户端）、`OIDC_REDIRECT_URI`
 3. 重启容器，登录页出现「Li&Pass SSO 登录」
 
+## 端口与反代
+
+- `docker compose up -d` 后，对外只暴露一个端口 `PANEL_PORT`（默认 `8000`），由内置 **nginx** 反代到后端 `lipanel:8000`；后端真实端口不直接映射到宿主机（`docker ps` 中仅 `lipanel-nginx` 发布端口）。
+- nginx 配置见 `nginx/nginx.conf`（代理头 `X-Real-IP`/`X-Forwarded-*`、上传上限 10m、gzip）。
+- 反向代理 HTTPS 时，在外部反代/Nginx 设置 `PANEL_COOKIE_SECURE=true`、`PANEL_HSTS=true`，并透传 `X-Forwarded-Proto`（后端 uvicorn 默认信任代理头）。
+- 开发直连后端可本地运行 `PANEL_PORT=8000 .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`。
+
 ## 仓库结构
 
 ```text

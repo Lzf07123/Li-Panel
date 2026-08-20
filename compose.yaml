@@ -10,8 +10,7 @@ services:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     image: lipanel:local
     container_name: lipanel
-    ports:
-      - "${PANEL_PORT:-8000}:${PANEL_PORT:-8000}"
+    # 后端端口不直接暴露主机，由下方 nginx 反代统一对外（隐藏真实端口）
     environment:
       PANEL_DATA_DIR: /app/data
       PANEL_PORT: ${PANEL_PORT:-8000}
@@ -27,4 +26,15 @@ services:
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
     volumes:
       - ./data:/app/data
+    restart: unless-stopped
+
+  nginx:
+    image: ${IMAGE_REGISTRY:-docker.io/library}/nginx:alpine
+    container_name: lipanel-nginx
+    depends_on:
+      - lipanel
+    ports:
+      - "${PANEL_PORT:-8000}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped

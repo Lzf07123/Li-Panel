@@ -185,4 +185,6 @@
 - 2026-08-21 增强：卡片健康结果统一右侧对齐并显示延迟（在线 `Nms`）；新建/编辑快捷方式自动后台抓取 favicon（不覆盖自定义图标），管理页「补抓缺失图标」批量按钮。
 - 2026-08-21 图标识别增强：全 `<link>` 候选解析（icon/apple-touch-icon/shortcut）、sizes 择优、`<base>`、data: URI、`/favicon.ico` 回退、SVG 与正确扩展名；延迟文本紧贴状态点（4px 间距）。
 - 2026-08-21 图标识别增强（第二轮）：manifest icons、`msapplication-TileImage`/`og:image`/`twitter:image` meta、根目录 favicon.png/svg 回退、非 base64 内联 SVG、sizes 优先评分；pytest 170 passed。
+- 2026-08-21 消息弹窗完善：新增 `loading` 通知类型、最大堆叠 5 条、默认标题 i18n。
+- 2026-08-21 编排加固：nginx 反代统一对外（`PANEL_PORT`），后端真实端口不映射宿主机。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。
