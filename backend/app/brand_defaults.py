@@ -8,7 +8,9 @@ SITE_DEFAULTS: dict[str, str] = {
     "description": "",
     "logo": "/brand-logo.webp",
     "favicon": "/favicon.webp",
-    "footer_text": "© 2026",
+    "footer_text": "",
+    # 旧版本曾把 "© 2026" 写入 footer_text，与前端固定版权行「© 年 品牌 · v版本」重复；
+    # 现在默认留空，页脚版权只渲染一次，footer_text 仅承载自定义补充文案。
     "icp": "",
     "icp_url": "https://beian.miit.gov.cn/",
     "icp_icon": "/badges/icp.webp",
@@ -29,6 +31,11 @@ def seed_site_defaults(conn: sqlite3.Connection, public_mode_default: bool) -> N
             "INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)",
             (key, value),
         )
+    # 迁移：清理旧版本遗留的重复版权值（等于旧默认 "© 2026" 时清空）
+    conn.execute(
+        "UPDATE site_settings SET value = '' "
+        "WHERE key = 'footer_text' AND value = '© 2026'"
+    )
     conn.commit()
 
 

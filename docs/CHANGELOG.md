@@ -8,6 +8,7 @@
 - **部署**：compose 补齐全部运行期环境变量透传（Host 白名单/HSTS/登录锁定/图标抓取/健康检查/备份保留/SSO 回跳等此前在容器内失效）；后端固定监听容器内 8000，`PANEL_PORT` 仅作宿主机对外端口，改端口不再导致反代断链；`NPM_REGISTRY` 经 `npm ci --registry` 真正生效（此前被 `frontend/.npmrc` 覆盖）；VITE_* 品牌构建参数接入 Docker 构建；nginx `gzip_types` 补 `text/javascript` 并开启 `gzip_static`/`gzip_vary`。
 - **脚本**：冒烟脚本导入断言改用链接总数（同名分组合并后 `groups+ungrouped` 不再增长）。
 - **启动容错**：数据目录不可写时启动报错改为可操作提示；compose 新增 `data-init` 一次性服务自动修正 `./data` 属主为 uid 10001；`scripts/fix-data-owner.sh` 保留作手动修复，README 补充 SELinux `:Z` 说明。
+- **页脚重复版权**：`footer_text` 默认改为空（前端固定渲染 `© 年 品牌 · v版本`），启动时自动清理旧库遗留的 `© 2026` 重复值。
 - 验证：pytest 177 passed（新增 6 项回归）；tsc/vite build/vitest 13 passed；镜像重建后健康检查、`docker stats` 46.66MiB、gzip 压缩、冒烟 PASS。
 
 ### 50 版本迭代（V01–V50 全量完成）

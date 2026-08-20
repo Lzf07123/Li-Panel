@@ -97,3 +97,31 @@ def test_notify_url_admin_only(client, auth_headers):
     r = client.get("/api/panel")
     assert "notify_url" not in r.json()["site"]
     assert "notify_enabled" not in r.json()["site"]
+
+
+def test_footer_text_default_empty_and_legacy_cleanup(tmp_path):
+    """页脚版权只渲染一次：新库默认 footer_text 为空，旧库遗留 '© 2026' 启动时自动清理。"""
+    from app.brand_defaults import get_site_settings, seed_site_defaults
+    from app.config import load_settings
+    from app.db import connect, init_schema
+    from app.main import create_app
+
+    app_settings = load_settings(
+        overrides={"data_dir": str(tmp_path), "secret_key": "x"}
+    )
+    create_app(app_settings)
+    conn = connect(app_settings.db_path)
+    assert get_site_settings(conn)["footer_text"] == ""
+    conn.close()
+
+    legacy_dir = tmp_path / "legacy"
+    legacy_dir.mkdir()
+    conn = connect(legacy_dir / "panel.db")
+    init_schema(conn)
+    conn.execute(
+        "INSERT OR REPLACE INTO site_settings (key, value) VALUES ('footer_text', '© 2026')"
+    )
+    conn.commit()
+    seed_site_defaults(conn, True)
+    assert get_site_settings(conn)["footer_text"] == ""
+    conn.close()
