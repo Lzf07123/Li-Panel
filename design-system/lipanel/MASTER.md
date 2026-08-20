@@ -95,6 +95,7 @@
 - V33 回程登出：`POST /auth/sso/backchannel`（JSON/form 双格式；`OIDCClient.validate_logout_token` 验签 + iss/aud/exp/events；按 sessions.sso_sid + sso_identities.subject 精确删除，幂等）；pytest 123 passed
 - V34 Host 白名单：`PANEL_ALLOWED_HOSTS`（精确/`*.` 通配，为空放行）；security 中间件先校验 Host；pytest 126 passed
 - V35 登录锁定：`LoginLockout`（用户名+IP，`PANEL_LOGIN_MAX_FAILS`/`PANEL_LOGIN_LOCK_MINUTES`，成功重置，未知用户同行为）；登录接口 429；pytest 130 passed
+- V36 角色与权限：site_settings 写接口 admin-only（403），读公开；前端按角色过滤「站点信息」标签页；pytest 133 passed
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

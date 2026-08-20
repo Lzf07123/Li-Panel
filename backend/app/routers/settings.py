@@ -64,6 +64,8 @@ def site_settings_put(
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可修改站点信息")
     payload = body.model_dump(exclude_unset=True)
     for key, value in payload.items():
         if key == "public_mode":

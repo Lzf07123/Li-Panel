@@ -83,6 +83,14 @@ export function SettingsPage() {
   const [unbindPassword, setUnbindPassword] = useState("");
   const [theme, setTheme] = useTheme();
   const toast = useToast();
+  const isAdmin = me?.user.role === "admin";
+  const visibleTabs = TABS.filter((item) => item.key !== "site" || isAdmin);
+
+  useEffect(() => {
+    if (me && !isAdmin && tab === "site") {
+      setTab("manage");
+    }
+  }, [me, isAdmin, tab]);
 
   useEffect(() => {
     authApi
@@ -449,7 +457,7 @@ export function SettingsPage() {
           className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:px-6 lg:px-8"
         >
           <ScrollTabs fadeColor="var(--lipanel-bg)">
-            {TABS.map((item) => (
+            {visibleTabs.map((item) => (
               <button
                 key={item.key}
                 type="button"
