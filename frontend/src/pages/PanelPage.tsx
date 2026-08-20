@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { authApi, panelApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
+import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
 import { LinkCard } from "../components/LinkCard";
@@ -30,6 +31,7 @@ export function PanelPage() {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [recents, setRecents] = useState<RecentItem[]>(getRecent);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,6 +64,19 @@ export function PanelPage() {
       a.localeCompare(b, "zh-CN"),
     );
   }, [panel]);
+  const allLinks = useMemo(
+    () => [
+      ...(panel?.groups ?? []).flatMap((group) => group.links),
+      ...(panel?.ungrouped ?? []),
+    ],
+    [panel],
+  );
+  const recentLinks = useMemo(() => {
+    const byId = new Map(allLinks.map((link) => [link.id, link]));
+    return recents
+      .map((item) => byId.get(item.id))
+      .filter((link): link is LinkOut => Boolean(link));
+  }, [recents, allLinks]);
   const flatLinks = useMemo(() => {
     const items: { link: LinkOut; id: string }[] = [];
     for (const group of groups) {
@@ -293,6 +308,36 @@ export function PanelPage() {
             </div>
           ) : null}
 
+          {!query.trim() && tagFilter === null && recentLinks.length > 0 ? (
+            <section className="mb-8">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-muted">
+                  <span className="h-px w-4 bg-border" />
+                  最近使用
+                </h2>
+                <button
+                  type="button"
+                  className="btn btn-ghost h-7 px-2 text-xs"
+                  onClick={() => {
+                    clearRecent();
+                    setRecents([]);
+                  }}
+                >
+                  清空
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {recentLinks.map((link) => (
+                  <LinkCard
+                    key={link.id}
+                    link={link}
+                    onActivate={(activated) => setRecents(recordRecent(activated))}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {groups.map((group) =>
             group.links.length === 0 ? null : (
               <section key={group.id} className="mb-8">
@@ -305,6 +350,7 @@ export function PanelPage() {
                     <LinkCard
                       key={link.id}
                       link={link}
+                      onActivate={(activated) => setRecents(recordRecent(activated))}
                       listIndex={flatLinks.findIndex(
                         (item) => item.link.id === link.id,
                       )}
@@ -326,6 +372,7 @@ export function PanelPage() {
                   <LinkCard
                     key={link.id}
                     link={link}
+                    onActivate={(activated) => setRecents(recordRecent(activated))}
                     listIndex={flatLinks.findIndex(
                       (item) => item.link.id === link.id,
                     )}

@@ -1,12 +1,15 @@
 import type { LinkOut } from "../api/types";
 import { ACCENT_CLASSES, accentFor } from "../lib/accent";
+import { recordRecent } from "../lib/recent";
 
 export function LinkCard({
   link,
   listIndex,
+  onActivate,
 }: {
   link: LinkOut;
   listIndex?: number;
+  onActivate?: (link: LinkOut) => void;
 }) {
   const href = link.url ? link.url : `/go/${link.id}`;
   const target = link.open_mode === "new_tab" ? "_blank" : undefined;
@@ -19,6 +22,10 @@ export function LinkCard({
       href={href}
       target={target}
       rel={target ? "noreferrer" : undefined}
+      onClick={() => {
+        recordRecent(link);
+        onActivate?.(link);
+      }}
       className="card card-interactive flex items-center gap-3 p-4"
     >
       {link.icon_type === "upload" && link.icon_value ? (
