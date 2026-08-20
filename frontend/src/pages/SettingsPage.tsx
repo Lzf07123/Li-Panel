@@ -53,6 +53,9 @@ export function SettingsPage() {
   const [deleteLinkId, setDeleteLinkId] = useState<number | null>(null);
   const [groupDragId, setGroupDragId] = useState<number | null>(null);
   const [groupDragOverId, setGroupDragOverId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [batchTargetGroup, setBatchTargetGroup] = useState("");
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
 
@@ -155,6 +158,33 @@ export function SettingsPage() {
       await linksApi.fetchIcon(link.id);
       setLinks(await linksApi.list());
       toast.success(`「${link.name}」图标已抓取`);
+    },
+    { onError: (err) => setError(err.message) },
+  );
+
+  const batchDeleteAction = useAsyncAction(async () => {
+    const count = selectedIds.size;
+    await linksApi.batchDelete([...selectedIds]);
+    setSelectedIds(new Set());
+    setBatchDeleteOpen(false);
+    setLinks(await linksApi.list());
+    toast.success(`已删除 ${count} 个快捷方式`);
+  }, { onError: (err) => setError(err.message) });
+
+  const batchMoveAction = useAsyncAction(async () => {
+    const groupId = batchTargetGroup ? Number(batchTargetGroup) : null;
+    await linksApi.batchMove([...selectedIds], groupId);
+    setSelectedIds(new Set());
+    setLinks(await linksApi.list());
+    toast.success("已移动所选快捷方式");
+  }, { onError: (err) => setError(err.message) });
+
+  const batchVisibilityAction = useAsyncAction(
+    async (is_public: boolean) => {
+      await linksApi.batchVisibility([...selectedIds], is_public);
+      setSelectedIds(new Set());
+      setLinks(await linksApi.list());
+      toast.success(is_public ? "已设为公开" : "已设为私密");
     },
     { onError: (err) => setError(err.message) },
   );
@@ -714,6 +744,58 @@ export function SettingsPage() {
                   </AsyncButton>
                 </form>
 
+                {selectedIds.size > 0 ? (
+                  <div className="card flex flex-wrap items-center gap-3 p-4">
+                    <span className="text-sm font-medium text-foreground">
+                      已选 {selectedIds.size} 项
+                    </span>
+                    <select
+                      className="input input-sm max-w-40"
+                      value={batchTargetGroup}
+                      onChange={(e) => setBatchTargetGroup(e.target.value)}
+                      aria-label="移动到分组"
+                    >
+                      <option value="">未分组</option>
+                      {groups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                    <AsyncButton
+                      type="button"
+                      status={batchMoveAction.status}
+                      className="btn btn-ghost h-8 px-3 text-xs"
+                      onClick={() => void batchMoveAction.run()}
+                    >
+                      移动
+                    </AsyncButton>
+                    <button
+                      type="button"
+                      className="btn btn-ghost h-8 px-3 text-xs"
+                      disabled={batchVisibilityAction.status === "pending"}
+                      onClick={() => void batchVisibilityAction.run(true)}
+                    >
+                      设为公开
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost h-8 px-3 text-xs"
+                      disabled={batchVisibilityAction.status === "pending"}
+                      onClick={() => void batchVisibilityAction.run(false)}
+                    >
+                      设为私密
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger h-8 px-3 text-xs"
+                      onClick={() => setBatchDeleteOpen(true)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                ) : null}
+
                 <div className="card p-6">
                   <h2 className="mb-3 text-sm font-semibold text-foreground">
                     快捷方式（{links.length}）
@@ -722,6 +804,24 @@ export function SettingsPage() {
                     <table>
                       <thead>
                         <tr>
+                          <th className="w-10">
+                            <input
+                              type="checkbox"
+                              aria-label="全选快捷方式"
+                              className="h-4 w-4 accent-primary"
+                              checked={
+                                links.length > 0 &&
+                                selectedIds.size === links.length
+                              }
+                              onChange={(e) =>
+                                setSelectedIds(
+                                  e.target.checked
+                                    ? new Set(links.map((l) => l.id))
+                                    : new Set(),
+                                )
+                              }
+                            />
+                          </th>
                           <th>名称</th>
                           <th>内网地址</th>
                           <th>可见性</th>
@@ -730,7 +830,29 @@ export function SettingsPage() {
                       </thead>
                       <tbody>
                         {links.map((link) => (
-                          <tr key={link.id}>
+                          <tr
+                            key={link.id}
+                            className={selectedIds.has(link.id) ? "bg-primary-soft/60" : ""}
+                          >
+                            <td>
+                              <input
+                                type="checkbox"
+                                aria-label={`选择 ${link.name}`}
+                                className="h-4 w-4 accent-primary"
+                                checked={selectedIds.has(link.id)}
+                                onChange={(e) =>
+                                  setSelectedIds((current) => {
+                                    const next = new Set(current);
+                                    if (e.target.checked) {
+                                      next.add(link.id);
+                                    } else {
+                                      next.delete(link.id);
+                                    }
+                                    return next;
+                                  })
+                                }
+                              />
+                            </td>
                             <td className="min-w-44 font-medium">{link.name}</td>
                             <td className="table-cell-clip max-w-56 font-mono text-xs text-muted">
                               {link.url_lan}
@@ -861,6 +983,15 @@ export function SettingsPage() {
           if (deleteGroupId !== null) void deleteGroupAction.run(deleteGroupId);
         }}
         onCancel={() => setDeleteGroupId(null)}
+      />
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        title="批量删除"
+        message={`确定删除选中的 ${selectedIds.size} 个快捷方式？删除后不可恢复。`}
+        confirmLabel="删除"
+        status={batchDeleteAction.status}
+        onConfirm={() => void batchDeleteAction.run()}
+        onCancel={() => setBatchDeleteOpen(false)}
       />
       <ConfirmDialog
         open={deleteLinkId !== null}

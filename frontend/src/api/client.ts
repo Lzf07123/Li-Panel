@@ -145,6 +145,21 @@ export const linksApi = {
     }),
   fetchIcon: (id: number) =>
     api<LinkOut>(`/api/links/${id}/fetch-icon`, { method: "POST" }),
+  batchDelete: (ids: number[]) =>
+    api<{ deleted: number }>("/api/links/batch-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  batchMove: (ids: number[], group_id: number | null) =>
+    api<{ moved: number }>("/api/links/batch-move", {
+      method: "POST",
+      body: JSON.stringify({ ids, group_id }),
+    }),
+  batchVisibility: (ids: number[], is_public: boolean) =>
+    api<{ updated: number }>("/api/links/batch-visibility", {
+      method: "POST",
+      body: JSON.stringify({ ids, is_public }),
+    }),
 };
 
 export const settingsApi = {

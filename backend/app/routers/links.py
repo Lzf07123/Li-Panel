@@ -47,6 +47,18 @@ class OrderIn(BaseModel):
     ordered_ids: list[int] = Field(min_length=1)
 
 
+class BatchIdsIn(BaseModel):
+    ids: list[int] = Field(min_length=1)
+
+
+class BatchMoveIn(BatchIdsIn):
+    group_id: int | None = None
+
+
+class BatchVisibilityIn(BatchIdsIn):
+    is_public: bool = False
+
+
 def _owned_link(conn: sqlite3.Connection, lid: int, user_id: int) -> sqlite3.Row:
     row = conn.execute(
         "SELECT * FROM links WHERE id = ? AND user_id = ?", (lid, user_id)
@@ -70,6 +82,68 @@ def _link_dict(row: sqlite3.Row) -> dict:
     data = dict(row)
     data["tags"] = json.loads(data["tags"] or "[]")
     return data
+
+
+def _owned_link_ids(
+    conn: sqlite3.Connection, ids: list[int], user_id: int
+) -> list[int]:
+    """校验全部 id 归属本人，返回存在的 id；任一非本人/不存在 → 404。"""
+    owned = {
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM links WHERE user_id = ?", (user_id,)
+        ).fetchall()
+    }
+    for lid in ids:
+        if lid not in owned:
+            raise HTTPException(status_code=404, detail="快捷方式不存在")
+    return ids
+
+
+@router.post("/batch-delete", status_code=200)
+def batch_delete_links(
+    body: BatchIdsIn,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    ids = _owned_link_ids(conn, body.ids, user["id"])
+    placeholders = ",".join("?" for _ in ids)
+    conn.execute(
+        f"DELETE FROM links WHERE id IN ({placeholders}) AND user_id = ?",
+        (*ids, user["id"]),
+    )
+    return {"deleted": len(ids)}
+
+
+@router.post("/batch-move", status_code=200)
+def batch_move_links(
+    body: BatchMoveIn,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    ids = _owned_link_ids(conn, body.ids, user["id"])
+    _check_group(conn, body.group_id, user["id"])
+    placeholders = ",".join("?" for _ in ids)
+    conn.execute(
+        f"UPDATE links SET group_id = ? WHERE id IN ({placeholders}) AND user_id = ?",
+        (body.group_id, *ids, user["id"]),
+    )
+    return {"moved": len(ids)}
+
+
+@router.post("/batch-visibility", status_code=200)
+def batch_visibility_links(
+    body: BatchVisibilityIn,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    ids = _owned_link_ids(conn, body.ids, user["id"])
+    placeholders = ",".join("?" for _ in ids)
+    conn.execute(
+        f"UPDATE links SET is_public = ? WHERE id IN ({placeholders}) AND user_id = ?",
+        (int(body.is_public), *ids, user["id"]),
+    )
+    return {"updated": len(ids)}
 
 
 @router.patch("/order")
