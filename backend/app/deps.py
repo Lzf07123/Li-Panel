@@ -23,3 +23,13 @@ def current_user(
         (lipanel_session,),
     )
     return user
+
+
+def optional_user(
+    request: Request,
+    lipanel_session: str | None = Cookie(default=None),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> sqlite3.Row | None:
+    if not lipanel_session:
+        return None
+    return get_session_user(conn, lipanel_session)
