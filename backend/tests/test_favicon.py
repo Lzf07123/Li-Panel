@@ -207,3 +207,125 @@ def test_auto_fetch_disabled(client, auth_headers, icon_server, tmp_path):
     links = c.get("/api/links", headers=headers).json()
     link = next(l for l in links if l["id"] == lid)
     assert link["icon_type"] == "letter"  # 开关关闭时不自动抓取
+
+
+class _SmartHandler(BaseHTTPRequestHandler):
+    """可配置 HTML：mode=fallback 无 link 但有 /favicon.ico；mode=size 两个图标；mode=data 内联；mode=apple 仅 apple-touch。"""
+    mode = "fallback"
+
+    def do_GET(self):  # noqa: N802
+        if self.path == "/favicon.ico" and self.mode == "fallback":
+            body, ctype = PNG_BYTES, "image/png"
+        elif self.mode == "size":
+            if self.path == "/icon-16.png":
+                body, ctype = PNG_BYTES, "image/png"
+            elif self.path == "/icon-64.png":
+                body, ctype = PNG_BYTES, "image/png"
+            else:
+                body = (
+                    b'<html><head>'
+                    b'<link rel="icon" href="/icon-16.png" sizes="16x16">'
+                    b'<link rel="icon" href="/icon-64.png" sizes="64x64">'
+                    b'</head></html>'
+                )
+                ctype = "text/html"
+        elif self.mode == "data":
+            import base64 as _b64
+
+            data_uri = b"data:image/png;base64," + _b64.b64encode(PNG_BYTES)
+            body = b"<html><head><link rel='icon' href='" + data_uri + b"'></head></html>"
+            ctype = "text/html"
+        elif self.mode == "apple":
+            if self.path == "/apple.png":
+                body, ctype = PNG_BYTES, "image/png"
+            else:
+                body = (
+                    b'<html><head><link rel="apple-touch-icon" href="/apple.png"></head></html>'
+                )
+                ctype = "text/html"
+        elif self.mode == "svg":
+            body = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>'
+            ctype = "image/svg+xml"
+        else:
+            body, ctype = PNG_BYTES, "image/png"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):  # noqa: D102
+        pass
+
+
+@pytest.fixture
+def smart_server():
+    _SmartHandler.mode = "fallback"
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _SmartHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}"
+    server.shutdown()
+
+
+def _fetch_and_get_icon(client, auth_headers, url):
+    lid = client.post(
+        "/api/links", json={"name": "站点", "url_lan": url}, headers=auth_headers
+    ).json()["id"]
+    r = client.post(f"/api/links/{lid}/fetch-icon", headers=auth_headers)
+    assert r.status_code == 200
+    return r.json()["icon_value"]
+
+
+def test_fallback_favicon_ico(client, auth_headers, smart_server):
+    _SmartHandler.mode = "fallback"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert icon.endswith(".png")  # /favicon.ico 回退成功
+
+
+def test_icon_size_preference(client, auth_headers, smart_server):
+    _SmartHandler.mode = "size"
+    # 请求 /icon-64.png 的路径会写进 /favicons 缓存文件名（无法直接看原路径），
+    # 这里验证能抓到且内容为 PNG 即可；size 择优由单元级直接验证。
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_icon_size_preference_unit():
+    from app.favicon import _pick_icon_url
+
+    html = (
+        '<html><head>'
+        '<link rel="icon" href="/icon-16.png" sizes="16x16">'
+        '<link rel="icon" href="/icon-64.png" sizes="64x64">'
+        '</head></html>'
+    )
+    assert _pick_icon_url(html, "http://x.example/") == "http://x.example/icon-64.png"
+
+
+def test_icon_base_href_unit():
+    from app.favicon import _pick_icon_url
+
+    html = '<html><head><base href="https://cdn.example/assets/"><link rel="icon" href="fav.png"></head></html>'
+    assert _pick_icon_url(html, "http://x.example/") == "https://cdn.example/assets/fav.png"
+
+
+def test_icon_data_uri(client, auth_headers, smart_server):
+    _SmartHandler.mode = "data"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_icon_apple_touch(client, auth_headers, smart_server):
+    _SmartHandler.mode = "apple"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_icon_svg_content_type(client, auth_headers, smart_server):
+    _SmartHandler.mode = "svg"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert icon.endswith(".svg")
+    resp = client.get(icon)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/svg+xml")

@@ -111,7 +111,7 @@ export function LinkCard({
         ) : null}
       </span>
       {status ? (
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+        <span className="ml-auto flex shrink-0 items-center gap-1">
           <span
             role="button"
             tabIndex={-1}
@@ -144,7 +144,7 @@ export function LinkCard({
             }`}
           />
           <span
-            className={`min-w-14 text-right text-xs tabular-nums leading-none ${
+            className={`min-w-12 text-left text-xs tabular-nums leading-none ${
               status === "up"
                 ? "text-success"
                 : status === "down"
