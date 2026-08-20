@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { authApi, panelApi } from "../api/client";
+import { authApi, healthApi, linksApi, panelApi, rssApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
@@ -9,16 +9,21 @@ import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
 import { DateTimeWidget } from "../components/DateTimeWidget";
+import { GroupIcon, isGroupIconName } from "../components/GroupIcon";
 import { LinkCard } from "../components/LinkCard";
+import { ACCENT_CLASSES, accentFor } from "../lib/accent";
 import { LinkPreviewModal } from "../components/LinkPreviewModal";
+import { HealthTrendModal } from "../components/HealthTrendModal";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { SiteFooter } from "../components/SiteFooter";
 import { AuroraBackground } from "../components/bits/AuroraBackground";
 import { BlurText } from "../components/bits/BlurText";
 import { FloatingBackground } from "../components/FloatingBackground";
 import { TechAmbience } from "../components/bits/TechAmbience";
+import { useToast } from "../hooks/useToast";
+import { useI18n } from "../lib/i18n";
 
-function matches(link: LinkOut, query: string): boolean {
+export function matches(link: LinkOut, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return (
@@ -38,13 +43,71 @@ export function PanelPage() {
   const [recents, setRecents] = useState<RecentItem[]>(getRecent);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [previewLink, setPreviewLink] = useState<LinkOut | null>(null);
+  const [trendLink, setTrendLink] = useState<LinkOut | null>(null);
+  const [rssData, setRssData] = useState<{
+    feeds: {
+      feed_url: string;
+      items: {
+        title: string;
+        link: string;
+        pub_date?: string;
+        description?: string;
+      }[];
+    }[];
+  } | null>(null);
+  const [rssOpen, setRssOpen] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(
     loadCollapsedGroups,
   );
+  const [linkHealth, setLinkHealth] = useState<
+    Record<number, { status: "up" | "down" | "unknown"; ms: number | null }>
+  >({});
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const toast = useToast();
+  const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    authApi.meSilent().then(setMe).catch(() => setMe(null));
+    authApi
+      .meSilent()
+      .then((current) => {
+        setMe(current);
+        void rssApi
+          .feeds()
+          .then(setRssData)
+          .catch(() => setRssData(null));
+        void healthApi
+          .links()
+          .then((data) => {
+            const map: Record<
+              number,
+              { status: "up" | "down" | "unknown"; ms: number | null }
+            > = {};
+            for (const item of data.results) {
+              map[item.link_id] = { status: item.status, ms: item.ms };
+            }
+            setLinkHealth(map);
+          })
+          .catch(() => undefined);
+      })
+      .catch(() => {
+        setMe(null);
+        // V27：访客公开状态页
+        void healthApi
+          .status()
+          .then((data) => {
+            const map: Record<
+              number,
+              { status: "up" | "down" | "unknown"; ms: number | null }
+            > = {};
+            for (const item of data.results) {
+              map[item.link_id] = { status: item.status, ms: item.ms };
+            }
+            setLinkHealth(map);
+          })
+          .catch(() => undefined);
+      });
     panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, []);
 
@@ -99,6 +162,25 @@ export function PanelPage() {
     return recents
       .map((item) => byId.get(item.id))
       .filter((link): link is LinkOut => Boolean(link));
+  }, [recents, allLinks]);
+  // V25：今天打开过的快捷方式（无则回退最近使用）
+  const todayLinks = useMemo(() => {
+    const now = new Date();
+    const isToday = (ts: number) => {
+      const d = new Date(ts);
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    };
+    const todayItems = recents.filter((item) => isToday(item.opened_at));
+    const items = todayItems.length > 0 ? todayItems : recents;
+    const byId = new Map(allLinks.map((link) => [link.id, link]));
+    return items
+      .map((item) => byId.get(item.id))
+      .filter((link): link is LinkOut => Boolean(link))
+      .slice(0, 6);
   }, [recents, allLinks]);
   const flatLinks = useMemo(() => {
     const items: { link: LinkOut; id: string }[] = [];
@@ -178,6 +260,56 @@ export function PanelPage() {
 
   const site = panel?.site;
   const total = flatLinks.length;
+  const canDrag = Boolean(me) && !searching;
+
+  function handleDragEnd() {
+    setDragId(null);
+    setDragOverId(null);
+  }
+
+  function handleDrop(target: LinkOut) {
+    const sourceId = dragId;
+    setDragId(null);
+    setDragOverId(null);
+    if (sourceId === null || sourceId === target.id) return;
+    const section = groups.find((group) =>
+      group.links.some((link) => link.id === sourceId),
+    );
+    const sectionLinks = section ? section.links : ungrouped;
+    const ids = sectionLinks.map((link) => link.id);
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(target.id);
+    if (from === -1 || to === -1) {
+      toast.info(t("拖拽排序仅在同一个分组内生效"));
+      return;
+    }
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPanel((current) => {
+      if (!current) return current;
+      const sourceLinks = section ? section.links : current.ungrouped;
+      const byId = new Map(sourceLinks.map((link) => [link.id, link]));
+      const ordered = next
+        .map((id) => byId.get(id))
+        .filter((link): link is LinkOut => Boolean(link));
+      const rest = sourceLinks.filter((link) => !next.includes(link.id));
+      const links = [...ordered, ...rest];
+      if (section) {
+        return {
+          ...current,
+          groups: current.groups.map((group) =>
+            group.id === section.id ? { ...group, links } : group,
+          ),
+        };
+      }
+      return { ...current, ungrouped: links };
+    });
+    linksApi.updateOrder(next).catch(() => {
+      toast.error(t("排序保存失败，已恢复原顺序"));
+      void panelApi.get().then(setPanel).catch(() => undefined);
+    });
+  }
 
   const logout = async () => {
     await authApi.logout().catch(() => undefined);
@@ -195,24 +327,24 @@ export function PanelPage() {
       <TechAmbience />
       <div className="relative z-10 flex flex-1 flex-col">
         <AppHeader
-          title={me ? `欢迎，${me.user.username}` : "快捷方式"}
+          title={me ? t("欢迎，{name}", { name: me.user.username }) : t("快捷方式")}
           actions={
             me ? (
               <>
                 <Link to="/settings" className="btn btn-ghost h-9 px-3">
-                  管理
+                  {t("管理")}
                 </Link>
                 <button
                   type="button"
                   className="btn btn-ghost h-9 px-3"
                   onClick={logout}
                 >
-                  退出
+                  {t("退出")}
                 </button>
               </>
             ) : (
               <Link to="/login" className="btn btn-primary h-9 px-4">
-                登录
+                {t("登录")}
               </Link>
             )
           }
@@ -242,9 +374,41 @@ export function PanelPage() {
               ) : null}
               <span className="badge badge-muted mt-1" aria-live="polite">
                 {query.trim()
-                  ? `找到 ${total} 个结果`
-                  : `共 ${total} 个快捷方式`}
+                  ? t("找到 {n} 个结果", { n: total })
+                  : t("共 {n} 个快捷方式", { n: total })}
               </span>
+              {me && !query.trim() && todayLinks.length > 0 ? (
+                <div
+                  className="mt-2 flex max-w-2xl flex-wrap items-center justify-center gap-2"
+                  aria-label={t("今天常用")}
+                >
+                  {todayLinks.map((link) => {
+                    const href = link.url ? link.url : `/go/${link.id}`;
+                    return (
+                      <a
+                        key={link.id}
+                        href={href}
+                        target={link.open_mode === "new_tab" ? "_blank" : undefined}
+                        rel={
+                          link.open_mode === "new_tab" ? "noreferrer" : undefined
+                        }
+                        title={link.description || link.name}
+                        className="badge badge-muted cursor-pointer border transition-colors hover:border-primary hover:text-primary"
+                        onClick={(event) => {
+                          const next = recordRecent(link);
+                          setRecents(next);
+                          if (link.open_mode === "modal") {
+                            event.preventDefault();
+                            setPreviewLink(link);
+                          }
+                        }}
+                      >
+                        {link.name}
+                      </a>
+                    );
+                  })}
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -265,7 +429,7 @@ export function PanelPage() {
               ref={searchRef}
               type="search"
               className="input pl-9"
-              placeholder="搜索名称、描述、标签…"
+              placeholder={t("搜索名称、描述、标签…")}
               aria-label="搜索快捷方式"
               title="按 / 聚焦；Ctrl/⌘ + K 打开命令面板"
               value={query}
@@ -290,7 +454,7 @@ export function PanelPage() {
                 }`}
                 onClick={() => setTagFilter(null)}
               >
-                全部
+                {t("全部")}
               </button>
               {allTags.map((tag) => {
                 const active = tagFilter === tag;
@@ -314,9 +478,11 @@ export function PanelPage() {
           {query.trim() && total === 0 ? (
             <div className="card mx-auto mb-10 max-w-md p-8 text-center">
               <p className="text-sm font-medium text-foreground">
-                没有找到匹配的快捷方式
+                {t("没有找到匹配的快捷方式")}
               </p>
-              <p className="mt-1 text-xs text-muted">用外部搜索引擎继续：</p>
+              <p className="mt-1 text-xs text-muted">
+                {t("用外部搜索引擎继续：")}
+              </p>
               <div className="mt-4 flex justify-center gap-2">
                 <a
                   className="btn btn-ghost h-9 px-4"
@@ -324,7 +490,7 @@ export function PanelPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Bing 搜索
+                  {t("Bing 搜索")}
                 </a>
                 <a
                   className="btn btn-ghost h-9 px-4"
@@ -332,7 +498,7 @@ export function PanelPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Google 搜索
+                  {t("Google 搜索")}
                 </a>
               </div>
             </div>
@@ -356,19 +522,19 @@ export function PanelPage() {
                 <rect x="14" y="14" width="7" height="7" rx="1.5" />
               </svg>
               <p className="mt-4 text-sm font-medium text-foreground">
-                {me ? "还没有快捷方式" : "这里还没有公开内容"}
+                {me ? t("还没有快捷方式") : t("这里还没有公开内容")}
               </p>
               <p className="mt-1 text-xs text-muted">
                 {me
-                  ? "去管理页添加你的第一个快捷方式。"
-                  : "登录后即可收藏常用入口。"}
+                  ? t("去管理页添加你的第一个快捷方式。")
+                  : t("登录后即可收藏常用入口。")}
               </p>
               <div className="mt-5">
                 <Link
                   to={me ? "/settings" : "/login"}
                   className="btn btn-primary h-9 px-4"
                 >
-                  {me ? "去添加" : "登录"}
+                  {me ? t("去添加") : t("登录")}
                 </Link>
               </div>
             </div>
@@ -379,7 +545,7 @@ export function PanelPage() {
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-muted">
                   <span className="h-px w-4 bg-border" />
-                  最近使用
+                  {t("最近使用")}
                   <span className="text-xs font-normal text-muted/80">
                     · {recentLinks.length}
                   </span>
@@ -392,7 +558,7 @@ export function PanelPage() {
                     setRecents([]);
                   }}
                 >
-                  清空
+                  {t("清空")}
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -421,7 +587,17 @@ export function PanelPage() {
                     )
                   }
                 >
-                  <span className="h-px w-4 bg-border" />
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
+                      ACCENT_CLASSES[accentFor(group.name)].tile
+                    }`}
+                  >
+                    {isGroupIconName(group.icon) ? (
+                      <GroupIcon name={group.icon} className="h-4 w-4" />
+                    ) : (
+                      group.name.trim().charAt(0).toUpperCase() || "?"
+                    )}
+                  </span>
                   {group.name}
                   <span className="text-xs font-normal text-muted/80">
                     · {group.links.length}
@@ -454,6 +630,15 @@ export function PanelPage() {
                         listIndex={flatLinks.findIndex(
                           (item) => item.link.id === link.id,
                         )}
+                        draggable={canDrag}
+                        isDragOver={dragOverId === link.id}
+                        status={linkHealth[link.id]?.status}
+                        statusMs={linkHealth[link.id]?.ms}
+                        onStatusClick={setTrendLink}
+                        onDragStart={(link) => setDragId(link.id)}
+                        onDragOver={(link) => setDragOverId(link.id)}
+                        onDrop={handleDrop}
+                        onDragEnd={handleDragEnd}
                       />
                     ))}
                   </div>
@@ -466,7 +651,7 @@ export function PanelPage() {
             <section className="mb-8">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
                 <span className="h-px w-4 bg-border" />
-                未分组
+                {t("未分组")}
                 <span className="text-xs font-normal text-muted/80">
                   · {ungrouped.length}
                 </span>
@@ -481,9 +666,69 @@ export function PanelPage() {
                     listIndex={flatLinks.findIndex(
                       (item) => item.link.id === link.id,
                     )}
+                    draggable={canDrag}
+                    isDragOver={dragOverId === link.id}
+                    status={linkHealth[link.id]?.status}
+                    statusMs={linkHealth[link.id]?.ms}
+                    onStatusClick={setTrendLink}
+                    onDragStart={(link) => setDragId(link.id)}
+                    onDragOver={(link) => setDragOverId(link.id)}
+                    onDrop={handleDrop}
+                    onDragEnd={handleDragEnd}
                   />
                 ))}
               </div>
+            </section>
+          ) : null}
+          {me && rssData && rssData.feeds.length > 0 ? (
+            <section className="mb-8">
+              <button
+                type="button"
+                aria-expanded={rssOpen}
+                className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted transition-colors hover:text-foreground"
+                onClick={() => setRssOpen((current) => !current)}
+              >
+                <span className="h-px w-4 bg-border" />
+                {t("订阅")}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    rssOpen ? "" : "-rotate-90"
+                  }`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {rssOpen ? (
+                <div className="card space-y-3 p-4">
+                  {rssData.feeds.map((feed) =>
+                    feed.items.map((item) => (
+                      <a
+                        key={`${feed.feed_url}-${item.link}`}
+                        href={item.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block min-w-0 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
+                      >
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {item.title}
+                        </span>
+                        {item.description ? (
+                          <span className="block truncate text-xs text-muted">
+                            {item.description}
+                          </span>
+                        ) : null}
+                      </a>
+                    )),
+                  )}
+                </div>
+              ) : null}
             </section>
           ) : null}
         </main>
@@ -496,6 +741,10 @@ export function PanelPage() {
         loggedIn={Boolean(me)}
       />
       <LinkPreviewModal link={previewLink} onClose={() => setPreviewLink(null)} />
+      <HealthTrendModal
+        link={trendLink}
+        onClose={() => setTrendLink(null)}
+      />
     </div>
   );
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -11,10 +11,147 @@ from pydantic import BaseModel, Field
 
 from app import oidc
 from app.db import create_user, get_db, get_user_by_username
+from app.audit import write_audit
+from app.deps import current_user
 from app.routers.setup import validate_username
 from app.security import create_session, delete_session, hash_password, new_token, verify_password
 
 router = APIRouter(tags=["sso"])
+
+
+class UnbindIn(BaseModel):
+    password: str
+
+
+def _safe_logout_redirect(value: str, settings) -> str:
+    """回跳白名单：环境变量 PANEL_SSO_LOGOUT_REDIRECTS；为空仅允许站内相对路径。"""
+    if value.startswith("/") and not value.startswith("//"):
+        return value
+    if value in settings.sso_logout_redirects:
+        return value
+    return "/"
+
+
+@router.post("/auth/sso/backchannel")
+async def sso_backchannel(
+    request: Request,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """回程登出：logout_token 验签后按 sub+sid 精确下线会话。"""
+    from app.oidc import OIDCError, OIDCClient
+
+    settings = request.app.state.settings
+    if not settings.oidc_enabled or not (
+        settings.oidc_issuer
+        and settings.oidc_client_id
+        and settings.oidc_redirect_uri
+    ):
+        raise HTTPException(status_code=400, detail="OIDC 未启用")
+    content_type = request.headers.get("content-type", "")
+    if "json" in content_type:
+        payload = await request.json()
+        token = payload.get("logout_token") if isinstance(payload, dict) else None
+    else:
+        form = await request.form()
+        token = form.get("logout_token")
+    if not token:
+        raise HTTPException(status_code=400, detail="缺少 logout_token")
+    try:
+        claims = OIDCClient(settings).validate_logout_token(token)
+    except OIDCError as exc:
+        raise HTTPException(status_code=401, detail=exc.message)
+    sid = claims.get("sid")
+    sub = claims.get("sub")
+    if not sid:
+        raise HTTPException(status_code=400, detail="缺少 sid")
+    conn.execute(
+        "DELETE FROM sessions WHERE sso_sid = ? AND user_id IN "
+        "(SELECT user_id FROM sso_identities WHERE subject = ?)",
+        (sid, sub),
+    )
+    return {"ok": True}
+
+
+@router.get("/auth/sso/logout")
+def sso_logout(
+    request: Request,
+    lipanel_session: Annotated[str | None, Cookie()] = None,
+    conn: sqlite3.Connection = Depends(get_db),
+    redirect_after: str = "/",
+) -> RedirectResponse:
+    """RP 发起登出：本地会话注销 + IdP end_session_endpoint（id_token_hint）+ 回跳白名单。"""
+    settings = request.app.state.settings
+    target = _safe_logout_redirect(redirect_after, settings)
+
+    id_token: str | None = None
+    if lipanel_session:
+        row = conn.execute(
+            "SELECT sso_id_token FROM sessions WHERE token = ?", (lipanel_session,)
+        ).fetchone()
+        if row is not None:
+            id_token = row["sso_id_token"]
+        delete_session(conn, lipanel_session)
+
+    if not settings.oidc_enabled or not (
+        settings.oidc_issuer
+        and settings.oidc_client_id
+        and settings.oidc_redirect_uri
+    ):
+        return RedirectResponse(target, status_code=302)
+
+    try:
+        from app.oidc import OIDCClient
+
+        discovery = OIDCClient(settings).discover()
+        end_session = discovery.get("end_session_endpoint")
+        if not end_session:
+            return RedirectResponse(target, status_code=302)
+        params: dict[str, str] = {"post_logout_redirect_uri": target}
+        if id_token:
+            params["id_token_hint"] = id_token
+        return RedirectResponse(end_session + "?" + urlencode(params), status_code=302)
+    except Exception:
+        return RedirectResponse(target, status_code=302)
+
+
+@router.get("/api/sso/status")
+def sso_status(
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    row = conn.execute(
+        "SELECT provider, email, nickname FROM sso_identities WHERE user_id = ?",
+        (user["id"],),
+    ).fetchone()
+    if row is None:
+        return {"bound": False, "provider": None, "email": None, "nickname": None}
+    return {
+        "bound": True,
+        "provider": row["provider"],
+        "email": row["email"],
+        "nickname": row["nickname"],
+    }
+
+
+@router.delete("/api/sso/identity")
+def sso_unbind(
+    body: UnbindIn,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """解绑 SSO：需本地密码确认；只删身份，不删本地账号。"""
+    row = conn.execute(
+        "SELECT id FROM sso_identities WHERE user_id = ?", (user["id"],)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=400, detail="当前账号未绑定 SSO")
+    from app.security import verify_password
+
+    if not verify_password(body.password, user["password_hash"], user["salt"]):
+        raise HTTPException(status_code=403, detail="本地密码错误")
+    conn.execute("DELETE FROM sso_identities WHERE id = ?", (row["id"],))
+    write_audit(conn, user["id"], "sso_unbind", user["username"])
+    return {"ok": True}
 
 FLOW_MINUTES = 10
 
@@ -136,8 +273,10 @@ def sso_callback(
             conn,
             identity["user_id"],
             sso_sid=claims.get("sid"),
+            sso_id_token=tokens.get("id_token"),
             session_days=settings.session_days,
         )
+        write_audit(conn, identity["user_id"], "sso_login", subject)
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(
             "lipanel_session",
@@ -246,12 +385,13 @@ def sso_link(
         ),
     )
     conn.execute("UPDATE sso_flows SET consumed = 1 WHERE id = ?", (flow["id"],))
+    write_audit(conn, user_id, f"sso_link_{body.action}", flow["subject"])
     session_token = create_session(
         conn, user_id, sso_sid=flow["sid"], session_days=settings.session_days
     )
     response = JSONResponse(status_code=status, content={"ok": True})
     response.set_cookie(
-        "lipanel_session",
+        settings.session_cookie,
         session_token,
         max_age=settings.session_days * 86400,
         httponly=True,
@@ -266,11 +406,12 @@ def sso_link(
 def logout_uri(
     request: Request,
     next: str | None = None,
-    lipanel_session: Annotated[str | None, Cookie()] = None,
     conn: sqlite3.Connection = Depends(get_db),
 ) -> RedirectResponse:
-    if lipanel_session:
-        delete_session(conn, lipanel_session)
+    settings = request.app.state.settings
+    token = request.cookies.get(settings.session_cookie)
+    if token:
+        delete_session(conn, token)
     target = next or "/"
     parsed = urlparse(target)
     host = request.headers.get("host", "").split(":")[0]
@@ -279,5 +420,5 @@ def logout_uri(
     elif parsed.netloc and parsed.hostname != host:
         target = "/"
     response = RedirectResponse(target, status_code=302)
-    response.delete_cookie("lipanel_session", path="/")
+    response.delete_cookie(settings.session_cookie, path="/")
     return response

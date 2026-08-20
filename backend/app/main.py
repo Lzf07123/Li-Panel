@@ -11,9 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from app.brand_defaults import seed_site_defaults
 from app.config import Settings, load_settings
 from app.db import connect, init_schema
-from app.routers import auth, groups, links, panel, setup, sso
+from app.routers import audit, auth, backup, groups, links, panel, rss, sessions, setup, sso, tags
+from app.routers import health as health_router
 from app.routers import settings as settings_router
 from app.security import RateLimiter
+from app.version import VERSION
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DIST_CANDIDATES = [
@@ -32,14 +34,16 @@ def _build_csp(settings: Settings) -> str:
     )
     return (
         f"default-src 'self'; connect-src 'self'; "
-        f"img-src 'self' data:; style-src {style_src}; object-src 'none'; "
-        f"base-uri 'self'; form-action 'self'; frame-src 'self' https: http:; "
-        f"frame-ancestors 'none'"
+        f"img-src 'self' data:; style-src {style_src}; font-src 'self' data:; "
+        f"object-src 'none'; base-uri 'self'; form-action 'self'; "
+        f"frame-src 'self' https: http:; frame-ancestors 'none'"
     )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
+    if settings.environment == "production" and len(settings.secret_key) < 32:
+        raise RuntimeError("PANEL_SECRET_KEY 长度必须 ≥ 32 字符（生产环境）")
     app = FastAPI(
         title="Li&Panel",
         docs_url=None if settings.environment == "production" else "/docs",
@@ -50,6 +54,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.db_path = settings.db_path
     app.state.uploads_dir = settings.uploads_dir
+    from app.security import LoginLockout
+
+    app.state.login_lockout = LoginLockout(
+        max_fails=settings.login_max_fails, lock_minutes=settings.login_lock_minutes
+    )
     app.state.login_limiter = RateLimiter(limit=10, window_seconds=60)
     app.state.setup_limiter = RateLimiter(limit=10, window_seconds=60)
     app.state.sso_limiter = RateLimiter(limit=10, window_seconds=60)
@@ -60,8 +69,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     seed_site_defaults(conn, settings.public_mode)
     conn.close()
 
+    def _host_allowed(host: str) -> bool:
+        if not settings.allowed_hosts:
+            return True
+        hostname = host.split(":")[0]
+        for allowed in settings.allowed_hosts:
+            if allowed == hostname:
+                return True
+            if allowed.startswith("*.") and hostname.endswith(allowed[1:]):
+                return True
+        return False
+
     @app.middleware("http")
     async def security(request: Request, call_next):
+        if not _host_allowed(request.headers.get("host", "")):
+            return JSONResponse({"error": "Host 不在白名单"}, status_code=403)
         if request.method in {"POST", "PUT", "DELETE", "PATCH"}:
             origin = request.headers.get("origin")
             if origin:
@@ -75,13 +97,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["content-security-policy"] = csp
         response.headers["x-content-type-options"] = "nosniff"
         response.headers["referrer-policy"] = "no-referrer"
+        response.headers["cross-origin-opener-policy"] = "same-origin"
+        response.headers["cross-origin-resource-policy"] = "same-origin"
+        response.headers["permissions-policy"] = (
+            "camera=(), microphone=(), geolocation=(), usb=()"
+        )
+        if settings.hsts:
+            response.headers["strict-transport-security"] = (
+                "max-age=63072000; includeSubDomains"
+            )
         if request.url.path.startswith(("/api/", "/auth/")):
             response.headers["cache-control"] = "no-store"
+        elif request.url.path.startswith("/assets/"):
+            response.headers["cache-control"] = (
+                "public, max-age=31536000, immutable"
+            )
+        response.headers["x-panel-version"] = VERSION
         return response
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"status": "ok"}
+        return {"status": "ok", "version": VERSION}
 
     app.include_router(setup.router)
     app.include_router(auth.router)
@@ -90,6 +126,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(links.router)
     app.include_router(panel.router)
     app.include_router(settings_router.router)
+    app.include_router(tags.router)
+    app.include_router(backup.router)
+    app.include_router(rss.router)
+    app.include_router(sessions.router)
+    app.include_router(audit.router)
+    app.include_router(health_router.router)
 
     if (FRONTEND_DIST / "assets").exists():
         app.mount(
@@ -100,7 +142,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa_fallback(path: str) -> FileResponse:
-        if path.startswith(("api/", "auth/", "go/", "uploads/")):
+        if path.startswith(("api/", "auth/", "go/", "uploads/", "favicons/")):
             raise HTTPException(status_code=404)
         candidate = FRONTEND_DIST / path
         if candidate.is_file():

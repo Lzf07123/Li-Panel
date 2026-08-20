@@ -137,5 +137,48 @@
 ## 5. 状态
 
 - ✅ V01–V10（Phase A）：2026-08-20 完成。提交范围 `c7a2766`（路线图）→ `c3253c7`（V10），每版独立提交；验收输出见 `design-system/lipanel/MASTER.md`。
-- ⬜ V11–V50：待执行；每版独立提交，可直接从 V11 继续。
+- ✅ V11（链接拖拽排序）：2026-08-21 完成。`PATCH /api/links/order`（整体重排、跨用户 404、重复 400）+ 面板 HTML5 组内拖拽（跨分组提示、失败回滚）。pytest 40 passed；Playwright 端到端：拖拽后顺序持久化。
+- ✅ V12（分组拖拽排序）：2026-08-21 完成。`PATCH /api/groups/order`（同 V11 语义）+ 管理页分组表 HTML5 拖拽。pytest 45 passed；Playwright 端到端：拖拽后顺序持久化。
+- ✅ V13（分组图标与配色）：2026-08-21 完成。内置 10 个线框图标（零外部依赖）+ 管理页图标选择 + 面板/访客稳定色相瓦片。pytest 48 passed；Playwright 端到端：图标保存并显示。
+- ✅ V14（链接图标自动抓取）：2026-08-21 完成。`POST /api/links/{id}/fetch-icon` 受控抓取（`PANEL_LINK_ICON_FETCH` 开关、5s 超时、并发 ≤4、60s 缓存、≤1MB、类型白名单、HTML icon 解析 + /favicon.ico 回退、SSRF 仅 http/https）；管理页「抓图标」按钮；`/favicons/{name}` 严格文件名白名单。pytest 53 passed；本地 fixture + Playwright 端到端通过。
+- ✅ V15（批量操作）：2026-08-21 完成。`batch-delete/move/visibility` 三接口（全量 user_id 校验、空列表 422）+ 管理页链接表多选、全选、批量操作栏与确认弹窗。pytest 59 passed；Playwright 端到端：勾选 2 项批量设公开成功。
+- ✅ V16（标签管理页）：2026-08-21 完成。`GET /api/tags` 统计、`PUT/DELETE /api/tags/{tag}` 重命名/删除（全量更新、去重保序、用户隔离、URL 编码中文标签）；管理页「标签管理」标签页（列表/计数/行内重命名/删除确认）。pytest 65 passed；Playwright 端到端：重命名 代码→工程 成功。
+- ✅ V17（重复检测）：2026-08-21 完成。创建/编辑同名或同 URL 返回 409（结构化 `{code,message}`，忽略自身、大小写不敏感），`force=true` 可强制保存；前端表单显示提示 + 「仍要保存」。pytest 70 passed；Playwright 端到端：409 → 提示 → 强制保存 201。
+- ✅ V18（JSON 备份导出/导入）：2026-08-21 完成。`GET/POST /api/backup`（分组/链接/个人设置；管理员含站点设置；导入校验 URL/结构后追加，不删除现有数据）；个人设置页「数据备份」导出下载/导入合并。pytest 76 passed；Playwright 端到端：导出 3 组/11 链接 → 导入后 6 组/22 链接。
+- ✅ V19（自动快照备份）：2026-08-21 完成。数据接口提交后（`total_changes` 精确检测）写 `data/backups/snapshot-*.json`，`PANEL_BACKUP_KEEP`（默认 10）滚动清理；登录等非数据请求不写。pytest 79 passed。
+- ✅ V20（恢复向导）：2026-08-21 完成。`GET /api/backup/snapshots` 预览条数（管理员）、`POST /api/backup/restore/{name}` 快照追加恢复（文件名白名单、按 user_id 过滤、管理员含站点设置）；个人设置页快照列表 + 确认弹窗。pytest 83 passed；Playwright 端到端：快照列表 → 恢复 → 链接 22→44。
+- ✅ Phase B（V11–V20）全部完成：2026-08-21，提交范围 `6f01ab3`（V11）→ `3313a50`（V20）。
+- ✅ V21（链接健康检查引擎）：2026-08-21 完成。`GET /api/health/links` 受控检查（`PANEL_HEALTH_CHECK` 开关、HEAD 优先 405/501 回退 GET、5s 超时、并发 ≤4、60s 缓存、<500 视为 up）；仅本人链接。pytest 89 passed（本地 fixture：up/down/缓存/关闭/隔离）。
+- ✅ V22（卡片状态点）：2026-08-21 完成。面板卡片状态点（up 绿 / down 红 / unknown 灰），hover 显示响应毫秒；健康检查并发化（ThreadPoolExecutor≤4）；SQLite `busy_timeout=10s` 硬化。pytest 89 passed；Playwright 端到端：44 个链接状态点全部渲染（在线/离线）。
+- ✅ V23（状态历史）：2026-08-21 完成。`link_health` 表（10 分钟采样、24h/144 条滚动清理）+ `GET /api/health/links/{id}/history`；卡片状态点点击弹趋势条（绿/红 + 图例）。pytest 93 passed；Playwright 端到端：点状态点弹出历史弹层。
+- ✅ V24（时钟小组件）：2026-08-21 完成（前端显示优化分支 `codex/frontend-display` 先行落地，`DateTimeWidget` 本地时区秒级更新，375px 不溢出；此处回填验收状态）。
+- ✅ V25（问候与快捷入口）：2026-08-21 完成。问候语（早晚/午/夜，登录显示用户名）+ 「今天」常用入口（当天打开的快捷方式 chips，无当天记录回退最近使用）。Playwright 端到端：chips 渲染。
+- ✅ V26（RSS/ATOM 小组件）：2026-08-21 完成。`app/rss.py` 受控抓取（≤3 源、8s 超时、并发 ≤3、10min 缓存、标准库 XML 解析 RSS/Atom）；`PUT /api/settings` 支持 `rss_feeds`（URL 校验、≤3）；`GET /api/rss`；个人设置页订阅管理 + 面板「订阅」折叠卡片。pytest 98 passed；Playwright 端到端：保存订阅 200 → 面板订阅区显示。顺带根治 SQLite `database is locked`（自动提交 + busy_timeout）。
+- ✅ V27（公开状态页）：2026-08-21 完成。`GET /api/health/status` 访客可用，仅返回公开链接状态（遵循 public_mode，私密绝不下发）；访客面板卡片显示状态点。pytest 100 passed；Playwright 端到端：访客看到 28 个公开链接状态点。
+- ✅ V28（通知通道）：2026-08-21 完成。站点设置 `notify_url/notify_enabled`（默认空/关）；状态相对上次采样变化时向 ntfy/Webhook POST JSON（5s 超时、失败静默）；首次采样视为变化。pytest 103 passed（本地 fixture：变化通知/同状态不通知/关闭不发/失败忽略）。
+- ✅ V29（检测配置中心）：2026-08-21 完成。links 新增 `health_enabled/health_interval/health_timeout/health_threshold`（含 ALTER 迁移与备份导入携带）；引擎按链接配置执行（开关排除、间隔采样、超时、连续失败阈值）；管理页链接表单「健康检查」配置组。pytest 106 passed（开关排除/阈值两轮判定/配置往返）。
+- ✅ V30（状态导出 API）：2026-08-21 完成。`GET /api/health/export?format=csv|json`（仅本人启用检测链接，含名称/状态/毫秒/时间）。pytest 110 passed。
+- ✅ Phase C（V21–V30）全部完成：2026-08-21，提交范围 `2d36084`（V21）→ `16d254e`（V30）。
+- ✅ V31（SSO 解绑/换绑）：2026-08-21 完成。`GET /api/sso/status` + `DELETE /api/sso/identity`（本地密码确认、错密 403、未绑定 400、不删本地账号）；个人设置页解绑确认弹窗（密码输入）。pytest 114 passed。
+- ✅ V32（RP 发起登出）：2026-08-21 完成。`GET /auth/sso/logout`：本地会话注销 + IdP `end_session_endpoint` + `id_token_hint`（sessions 新增 `sso_id_token` 列）+ 回跳白名单 `PANEL_SSO_LOGOUT_REDIRECTS`（为空仅站内相对路径）。pytest 117 passed（本地 issuer fixture：仅本地/白名单/IdP 跳转）。
+- ✅ V33（回程登出）：2026-08-21 完成。`POST /auth/sso/backchannel`：logout_token 验签（JWKS、iss/aud/exp/events 事件）+ `sub`+`sid` 精确下线；未知 sid 幂等 200；伪造/缺事件 401。pytest 123 passed（本地 JWKS + RSA 签名 fixture）。
+- ✅ V34（Host 白名单）：2026-08-21 完成。`PANEL_ALLOWED_HOSTS`（逗号分隔，支持 `*.example.com` 通配；为空放行）；中间件校验 Host 非白名单 403。pytest 126 passed（精确/通配/放行）。
+- ✅ V35（登录锁定）：2026-08-21 完成。每用户名+IP 连续失败 `PANEL_LOGIN_MAX_FAILS`（默认 5）锁 `PANEL_LOGIN_LOCK_MINUTES`（默认 15）分钟；达阈值当次 401、下次起 429；成功重置；未知用户同样计数不泄露存在性。pytest 130 passed。
+- ✅ V36（角色与权限）：2026-08-21 完成。`site_settings` 写接口仅 admin（403），读保持公开；前端按角色隐藏「站点信息」标签页（非 admin 自动切到管理页）。pytest 133 passed。
+- ✅ V37（会话管理）：2026-08-21 完成。`GET/DELETE /api/sessions`（本人会话列表含 current 标记；单点吊销、当前会话拒绝 400、跨用户 404、吊销其他全部）；个人设置页会话管理卡片。pytest 138 passed。
+- ✅ V38（审计日志）：2026-08-21 完成。`audit_logs` 表（登录/登出/SSO 登录/绑定/解绑/备份导入恢复/站点设置变更），滚动保留 1000 条；`GET /api/audit-logs` 仅 admin。pytest 142 passed。
+- ✅ V39（安全响应头补全）：2026-08-21 完成。CSP `font-src 'self' data:`；`COOP: same-origin`、`CORP: same-origin`、`Permissions-Policy`、HSTS（`PANEL_HSTS`，默认关）。pytest 144 passed。
+- ✅ V40（密钥与上传加固）：2026-08-21 完成。Cookie 前缀 `__Host-`（`PANEL_HOST_COOKIE`，全链路 cookie 名变量化）；上传魔数校验（png/jpg/gif/webp）；生产环境 secret ≥32 启动校验。pytest 148 passed。
+- ✅ Phase D（V31–V40）全部完成：2026-08-21，提交范围 `c6a38ef`（V31）→ `9278c54`（V40）。
+- ✅ V41（PWA 清单与图标）：2026-08-21 完成。`public/manifest.json`（name/start_url/standalone/主题色/512 maskable+any）、`application-name`、apple-touch-icon；构建产物含 manifest。
+- ✅ V42（离线缓存外壳）：2026-08-21 完成。`public/sw.js`（/assets 缓存优先、导航网络优先失败回退首页、API/auth 不缓存、版本化清理）+ 生产构建注册。构建产物含 sw.js。
+- ✅ V43（i18n 框架）：2026-08-21 完成。`src/lib/i18n.ts`（中文原文即 key、en-US 字典、`{param}` 插值、`useI18n`）+ `src/locales/en-US.ts`；面板/设置/登录/命令面板/状态趋势等主要页面文案迁移（品牌与配置项文案保留原文，作为配置驱动字段豁免）。
+- ✅ V44（语言偏好）：2026-08-21 完成。个人设置页语言选择（中文/English），localStorage + 后端用户设置 `lang` 双持久化，`document.documentElement.lang` 同步；浏览器偏好回退。pytest 149 passed；Playwright 端到端：切 English 后面板显示 Welcome/Manage/Sign out。
+- ✅ V45（静态资源长期缓存）：2026-08-21 完成。`/assets/*` `Cache-Control: public, max-age=31536000, immutable`；API 保持 no-store；响应头 `X-Panel-Version`。pytest 通过。
+- ✅ V46（版本信息）：2026-08-21 完成。`app/version.py` 单一事实来源；`/api/health` 返回 `version`；页脚显示版本；`docs/CHANGELOG.md`。
+- ✅ V47（部署加固文档）：2026-08-21 完成。README 增加镜像钉扎/反代 HTTPS/Host 白名单/备份恢复演练/`PANEL_SECRET_KEY` 轮换。
+- ✅ V48（前端测试补齐）：2026-08-21 完成。vitest 13 passed（i18n/标签解析/强调色稳定/折叠持久化/最近使用）。
+- ✅ V49（端到端冒烟脚本）：2026-08-21 完成。`scripts/smoke.sh` 干净数据目录全流程 PASS（初始化→登录→建分组/链接→可见性→导出→导入→访客可见性）。
+- ✅ V50（性能与内存回归）：2026-08-21 完成。`scripts/check-size.sh` 构建体积 543,500B（预算 2MB）PASS；pytest 151 passed；`npm run build`（tsc -b + vite + precompress）通过；容器实测 health `{"status":"ok","version":"0.1.0"}`、`docker stats` 46.5MiB / 3 进程（≤90MB 达标）。
+- ✅ **Phase E（V41–V50）全部完成，V11–V50 全量完成**：2026-08-21，提交范围见 git log。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

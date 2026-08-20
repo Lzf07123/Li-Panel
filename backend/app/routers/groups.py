@@ -18,6 +18,10 @@ class GroupIn(BaseModel):
     sort_order: int = 0
 
 
+class OrderIn(BaseModel):
+    ordered_ids: list[int] = Field(min_length=1)
+
+
 def _owned_group(conn: sqlite3.Connection, gid: int, user_id: int) -> sqlite3.Row:
     row = conn.execute(
         "SELECT * FROM groups WHERE id = ? AND user_id = ?", (gid, user_id)
@@ -25,6 +29,35 @@ def _owned_group(conn: sqlite3.Connection, gid: int, user_id: int) -> sqlite3.Ro
     if row is None:
         raise HTTPException(status_code=404, detail="分组不存在")
     return row
+
+
+@router.patch("/order")
+def order_groups(
+    body: OrderIn,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """整组写入分组顺序：提供的 id 前置整体重排，其余保持原相对顺序。"""
+    if len(set(body.ordered_ids)) != len(body.ordered_ids):
+        raise HTTPException(status_code=400, detail="排序列表包含重复项")
+    owned = conn.execute(
+        "SELECT id FROM groups WHERE user_id = ? ORDER BY sort_order, id",
+        (user["id"],),
+    ).fetchall()
+    owned_ids = {r["id"] for r in owned}
+    for gid in body.ordered_ids:
+        if gid not in owned_ids:
+            raise HTTPException(status_code=404, detail="分组不存在")
+    provided = set(body.ordered_ids)
+    new_order = list(body.ordered_ids) + [
+        r["id"] for r in owned if r["id"] not in provided
+    ]
+    for index, gid in enumerate(new_order):
+        conn.execute(
+            "UPDATE groups SET sort_order = ? WHERE id = ? AND user_id = ?",
+            (index, gid, user["id"]),
+        )
+    return {"ok": True}
 
 
 @router.get("")

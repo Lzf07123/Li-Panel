@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
@@ -10,7 +12,9 @@ from pydantic import BaseModel, Field
 
 from app.brand_defaults import get_site_settings
 from app.db import get_db
+from app.audit import write_audit
 from app.deps import current_user
+from app.rss import MAX_FEEDS, allowed_url
 
 router = APIRouter(tags=["settings"])
 
@@ -26,6 +30,8 @@ SITE_KEYS = {
     "footer_text",
     "icp",
     "public_mode",
+    "notify_url",
+    "notify_enabled",
 }
 
 USER_KEYS = {"theme", "link_mode"}
@@ -42,6 +48,8 @@ class SiteSettingsIn(BaseModel):
     footer_text: str | None = Field(default=None, max_length=200)
     icp: str | None = Field(default=None, max_length=100)
     public_mode: bool | None = None
+    notify_url: str | None = Field(default=None, max_length=500)
+    notify_enabled: bool | None = None
 
 
 @router.get("/api/site-settings")
@@ -57,10 +65,17 @@ def site_settings_put(
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可修改站点信息")
     payload = body.model_dump(exclude_unset=True)
+    write_audit(conn, user["id"], "site_settings_update", ",".join(payload.keys()))
     for key, value in payload.items():
         if key == "public_mode":
             value = "true" if value else "false"
+        if key == "notify_enabled":
+            value = "true" if value else "false"
+        if key == "notify_url" and value and not value.startswith(("http://", "https://")):
+            raise HTTPException(status_code=422, detail="通知地址必须以 http(s):// 开头")
         conn.execute(
             "INSERT INTO site_settings (key, value, updated_at) VALUES (?, ?, datetime('now')) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
@@ -72,6 +87,8 @@ def site_settings_put(
 class UserSettingsIn(BaseModel):
     theme: str | None = None
     link_mode: str | None = None
+    lang: str | None = None
+    rss_feeds: list[str] | None = None
 
 
 @router.get("/api/settings")
@@ -97,12 +114,40 @@ def user_settings_put(
             raise HTTPException(status_code=422, detail="theme 取值非法")
         if key == "link_mode" and value not in LINK_MODE_VALUES:
             raise HTTPException(status_code=422, detail="link_mode 取值非法")
+        if key == "lang" and value not in {"zh-CN", "en-US"}:
+            raise HTTPException(status_code=422, detail="lang 取值非法")
+        if key == "rss_feeds":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=422, detail="rss_feeds 必须是数组")
+            if len(value) > MAX_FEEDS:
+                raise HTTPException(status_code=422, detail=f"最多 {MAX_FEEDS} 个订阅源")
+            for feed in value:
+                if not isinstance(feed, str) or not allowed_url(feed):
+                    raise HTTPException(
+                        status_code=400, detail=f"订阅源地址不合法：{feed!r}"
+                    )
+            value = json.dumps(value, ensure_ascii=False)
         conn.execute(
             "INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?) "
             "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
             (user["id"], key, str(value)),
         )
     return user_settings_get(user, conn)
+
+
+MAGIC_BYTES = {
+    "png": b"\x89PNG\r\n\x1a\n",
+    "jpg": b"\xff\xd8\xff",
+    "jpeg": b"\xff\xd8\xff",
+    "gif": b"GIF8",
+}
+
+
+def _magic_ok(ext: str, data: bytes) -> bool:
+    signature = MAGIC_BYTES.get(ext)
+    if signature is None:  # webp：RIFF....WEBP
+        return data.startswith(b"RIFF") and data[8:12] == b"WEBP"
+    return data.startswith(signature)
 
 
 @router.post("/api/uploads")
@@ -119,11 +164,23 @@ def upload_file(
     data = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=422, detail="图片不能超过 2MB")
+    if not _magic_ok(ext, data):
+        raise HTTPException(status_code=422, detail="文件内容与扩展名不符")
     name = f"{uuid4().hex}.{ext}"
     uploads_dir = request.app.state.settings.uploads_dir
     uploads_dir.mkdir(parents=True, exist_ok=True)
     (uploads_dir / name).write_bytes(data)
     return {"url": f"/uploads/{name}"}
+
+
+@router.get("/favicons/{name}")
+def favicon_file(request: Request, name: str) -> FileResponse:
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    path = request.app.state.settings.data_dir / "favicons" / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return FileResponse(path)
 
 
 @router.get("/uploads/{name}")

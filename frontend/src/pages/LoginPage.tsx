@@ -8,6 +8,7 @@ import { Notice } from "../components/Notice";
 import { PasswordInput } from "../components/PasswordInput";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useToast } from "../hooks/useToast";
+import { useI18n } from "../lib/i18n";
 import { APP_NAME } from "../lib/brand";
 import { isSafeNext } from "../lib/navigation";
 import { getRememberedAccount, persistRememberedAccount } from "../lib/remember";
@@ -22,6 +23,7 @@ export function LoginPage() {
   const [username, setUsername] = useState(
     usernameParam ?? rememberedAccount ?? "",
   );
+  const { t } = useI18n();
   const [password, setPassword] = useState("");
   const [rememberAccount, setRememberAccount] = useState(
     rememberedAccount !== null,
@@ -71,7 +73,7 @@ export function LoginPage() {
           </Notice>
         ) : null}
         <label className="block">
-          <span className="label">用户名</span>
+          <span className="label">{t("用户名")}</span>
           <input
             type="text"
             value={username}
@@ -82,7 +84,7 @@ export function LoginPage() {
           />
         </label>
         <label className="block">
-          <span className="label">密码</span>
+          <span className="label">{t("密码")}</span>
           <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -98,18 +100,18 @@ export function LoginPage() {
             onChange={(e) => setRememberAccount(e.target.checked)}
             className="h-4 w-4 accent-primary"
           />
-          记住账号
+          {t("记住账号")}
         </label>
         <AsyncButton
           type="submit"
           status={loginAction.status}
           className="btn btn-primary w-full"
         >
-          登录
+          {t("登录")}
         </AsyncButton>
         {ssoEnabled ? (
           <a href="/auth/sso/login" className="btn btn-secondary w-full">
-            Li&Pass SSO 登录
+            {t("Li&Pass SSO 登录")}
           </a>
         ) : null}
       </form>

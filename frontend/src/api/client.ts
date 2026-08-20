@@ -44,6 +44,16 @@ async function api<T>(
     const body = (await response.json().catch(() => ({}))) as {
       detail?: unknown;
     };
+    if (
+      typeof body.detail === "object" &&
+      body.detail !== null &&
+      typeof (body.detail as { message?: unknown }).message === "string"
+    ) {
+      const detail = body.detail as { message: string; code?: string };
+      const error = new Error(detail.message) as Error & { code?: string };
+      error.code = detail.code;
+      throw error;
+    }
     if (typeof body.detail === "string") {
       throw new Error(body.detail);
     }
@@ -102,21 +112,50 @@ export const authApi = {
     }),
 };
 
+export const healthApi = {
+  status: () =>
+    api<{
+      enabled: boolean;
+      results: { link_id: number; status: "up" | "down"; ms: number; checked_at: string }[];
+    }>("/api/health/status"),
+  links: () =>
+    api<{
+      enabled: boolean;
+      results: { link_id: number; status: "up" | "down"; ms: number; checked_at: string }[];
+    }>("/api/health/links"),
+  history: (linkId: number) =>
+    api<
+      { status: "up" | "down"; ms: number; checked_at: string }[]
+    >(`/api/health/links/${linkId}/history`),
+};
+
 export const panelApi = {
   get: () => api<PanelOut>("/api/panel"),
 };
 
 export const groupsApi = {
   list: () => api<GroupOut[]>("/api/groups"),
-  create: (data: { name: string; is_public: boolean }) =>
-    api<GroupOut>("/api/groups", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: number, data: { name: string; is_public: boolean }) =>
+  create: (data: {
+    name: string;
+    is_public: boolean;
+    icon?: string | null;
+  }) => api<GroupOut>("/api/groups", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: number, data: {
+    name: string;
+    is_public: boolean;
+    icon?: string | null;
+  }) =>
     api<GroupOut>(`/api/groups/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
   remove: (id: number) =>
     api<void>(`/api/groups/${id}`, { method: "DELETE" }),
+  updateOrder: (ordered_ids: number[]) =>
+    api<{ ok: boolean }>("/api/groups/order", {
+      method: "PATCH",
+      body: JSON.stringify({ ordered_ids }),
+    }),
 };
 
 export const linksApi = {
@@ -126,6 +165,118 @@ export const linksApi = {
   update: (id: number, data: Partial<LinkOut> & { name: string; url_lan: string }) =>
     api<LinkOut>(`/api/links/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id: number) => api<void>(`/api/links/${id}`, { method: "DELETE" }),
+  updateOrder: (ordered_ids: number[]) =>
+    api<{ ok: boolean }>("/api/links/order", {
+      method: "PATCH",
+      body: JSON.stringify({ ordered_ids }),
+    }),
+  fetchIcon: (id: number) =>
+    api<LinkOut>(`/api/links/${id}/fetch-icon`, { method: "POST" }),
+  batchDelete: (ids: number[]) =>
+    api<{ deleted: number }>("/api/links/batch-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  batchMove: (ids: number[], group_id: number | null) =>
+    api<{ moved: number }>("/api/links/batch-move", {
+      method: "POST",
+      body: JSON.stringify({ ids, group_id }),
+    }),
+  batchVisibility: (ids: number[], is_public: boolean) =>
+    api<{ updated: number }>("/api/links/batch-visibility", {
+      method: "POST",
+      body: JSON.stringify({ ids, is_public }),
+    }),
+};
+
+export const tagsApi = {
+  list: () => api<{ name: string; count: number }[]>("/api/tags"),
+  rename: (tag: string, name: string) =>
+    api<{ renamed: number }>(`/api/tags/${encodeURIComponent(tag)}`, {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    }),
+  remove: (tag: string) =>
+    api<{ removed: number }>(`/api/tags/${encodeURIComponent(tag)}`, {
+      method: "DELETE",
+    }),
+};
+
+export const sessionsApi = {
+  list: () =>
+    api<
+      {
+        id: number;
+        created_at: string;
+        last_used_at: string | null;
+        expires_at: string;
+        current: boolean;
+      }[]
+    >("/api/sessions"),
+  revoke: (id: number) =>
+    api<{ revoked: number }>(`/api/sessions/${id}`, { method: "DELETE" }),
+  revokeAll: () =>
+    api<{ revoked: number }>("/api/sessions", { method: "DELETE" }),
+};
+
+export const ssoApi = {
+  status: () =>
+    api<{
+      bound: boolean;
+      provider: string | null;
+      email: string | null;
+      nickname: string | null;
+    }>("/api/sso/status"),
+  unbind: (password: string) =>
+    api<{ ok: boolean }>("/api/sso/identity", {
+      method: "DELETE",
+      body: JSON.stringify({ password }),
+    }),
+};
+
+export const rssApi = {
+  feeds: () =>
+    api<{
+      feeds: {
+        feed_url: string;
+        items: {
+          title: string;
+          link: string;
+          pub_date?: string;
+          description?: string;
+        }[];
+      }[];
+    }>("/api/rss"),
+  setFeeds: (urls: string[]) =>
+    api<Record<string, string>>("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ rss_feeds: urls }),
+    }),
+};
+
+export const backupApi = {
+  export: () => api<Record<string, unknown>>("/api/backup"),
+  import: (data: unknown) =>
+    api<{ imported: Record<string, number> }>("/api/backup", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  listSnapshots: () =>
+    api<
+      {
+        name: string;
+        created_at?: string;
+        groups: number;
+        links: number;
+        settings: number;
+        site_settings: number;
+      }[]
+    >("/api/backup/snapshots"),
+  restore: (name: string) =>
+    api<{ restored: Record<string, number> }>(
+      `/api/backup/restore/${encodeURIComponent(name)}`,
+      { method: "POST" },
+    ),
 };
 
 export const settingsApi = {

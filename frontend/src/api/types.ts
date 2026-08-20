@@ -22,6 +22,8 @@ export interface SiteSettings {
   footer_text: string;
   icp: string;
   public_mode: string;
+  notify_url: string;
+  notify_enabled: string;
   oidc_enabled?: boolean;
 }
 
@@ -40,6 +42,10 @@ export type LinkOut = {
   guest_url_mode: "hidden" | "show";
   sort_order: number;
   open_mode: "new_tab" | "modal";
+  health_enabled: boolean;
+  health_interval: number;
+  health_timeout: number;
+  health_threshold: number;
 };
 
 export interface GroupOut {

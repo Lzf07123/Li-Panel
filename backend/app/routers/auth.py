@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Annotated
-
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from app.db import get_db, get_user_by_username
 from app.deps import current_user
+from app.audit import write_audit
 from app.security import create_session, delete_session, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -29,15 +28,24 @@ def login(
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
     ip = request.client.host if request.client else "unknown"
+    settings = request.app.state.settings
     if not request.app.state.login_limiter.allow(ip):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+    lockout = request.app.state.login_lockout
+    if lockout.is_locked(body.username, ip):
+        raise HTTPException(
+            status_code=429,
+            detail=f"尝试次数过多，请 {settings.login_lock_minutes} 分钟后再试",
+        )
     user = get_user_by_username(conn, body.username)
     if user is None or not verify_password(body.password, user["password_hash"], user["salt"]):
+        lockout.record_failure(body.username, ip)
         raise HTTPException(status_code=401, detail="用户名或密码错误")
-    settings = request.app.state.settings
+    lockout.record_success(body.username, ip)
+    write_audit(conn, user["id"], "login", body.username)
     token = create_session(conn, user["id"], session_days=settings.session_days)
     response.set_cookie(
-        "lipanel_session",
+        settings.session_cookie,
         token,
         max_age=settings.session_days * 86400,
         httponly=True,
@@ -51,12 +59,19 @@ def login(
 @router.post("/logout", status_code=204)
 def logout(
     response: Response,
-    lipanel_session: Annotated[str | None, Cookie()] = None,
+    request: Request,
     conn: sqlite3.Connection = Depends(get_db),
 ) -> None:
-    if lipanel_session:
-        delete_session(conn, lipanel_session)
-    response.delete_cookie("lipanel_session", path="/")
+    cookie_name = request.app.state.settings.session_cookie
+    token = request.cookies.get(cookie_name)
+    if token:
+        row = conn.execute(
+            "SELECT user_id FROM sessions WHERE token = ?", (token,)
+        ).fetchone()
+        if row is not None:
+            write_audit(conn, row["user_id"], "logout", "")
+        delete_session(conn, token)
+    response.delete_cookie(cookie_name, path="/")
 
 
 @router.get("/me")

@@ -5,6 +5,7 @@ import { APP_NAME } from "../lib/brand";
 import { ShinyText } from "./bits/ShinyText";
 import { Brand } from "./Brand";
 import { ThemeToggle } from "./ThemeToggle";
+import { useI18n } from "../lib/i18n";
 
 export function AppHeader({
   title,
@@ -13,6 +14,7 @@ export function AppHeader({
   title: string;
   actions?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/85 backdrop-blur">
       <span
@@ -23,7 +25,7 @@ export function AppHeader({
         <Link
           to="/"
           className="flex shrink-0 items-center gap-2.5 rounded-lg"
-          aria-label={`${APP_NAME} 首页`}
+          aria-label={`${APP_NAME} ${t("首页")}`}
         >
           <Brand className="h-8 w-8" />
           <ShinyText

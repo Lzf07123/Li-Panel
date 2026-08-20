@@ -68,6 +68,45 @@
 - 设置页表格窄屏优化：名称列 `min-w` 保证可读，移动端 `overflow-x-auto` 横向滚动；操作列 `whitespace-nowrap` 防换行
 - 验证：`npx tsc --noEmit && npx vite build` 通过；后端 pytest 35 passed（无后端改动）；Playwright 实测时钟每秒跳动、长标题两行完整显示、四档视口无横向溢出、无断图、对比度无低值
 
+2026-08-21 Phase B（V11–V20）实测：
+
+- V11 链接拖拽排序：`PATCH /api/links/order`（提供 id 前置整体重排，重复 400 / 跨用户 404）；面板卡片 HTML5 组内拖拽，跨分组提示「仅同组生效」，保存失败回滚；`npx tsc --noEmit && npx vite build` 通过，pytest 40 passed，Playwright 组内拖拽端到端（PATCH 200 + 顺序持久化）通过
+- V12 分组拖拽排序：`PATCH /api/groups/order`（同 V11 整体重排语义）；管理页分组表拖拽行高亮；pytest 45 passed，Playwright 拖拽 常用→娱乐 后顺序持久化
+- V13 分组图标与配色：新增 `GroupIcon`（10 个内置线框图标，零外部依赖/不破坏 CSP）；管理页创建表单与表格行内图标选择，切换可见性不丢 icon；面板与访客视图分组标题显示稳定色相图标瓦片（无图标回退首字母）；pytest 48 passed，Playwright 设置→面板/访客显示通过
+- V14 链接图标自动抓取：新增 `app/favicon.py` 受控出站模块（`PANEL_LINK_ICON_FETCH`、5s 超时、BoundedSemaphore(4)、60s 内存缓存、1MB 上限、png/jpeg/webp/ico 白名单、HTML `<link rel=icon>` 解析与 `/favicon.ico` 回退、仅 http/https）；`POST /api/links/{id}/fetch-icon` 写回 `icon_type=upload`；`/favicons/{name}` 文件名正则白名单 + SPA fallback 排除；管理页「抓图标」按钮；pytest 53 passed（本地 fixture 服务器），Playwright 端到端通过
+- V15 批量操作：`POST /api/links/batch-delete|batch-move|batch-visibility`（全量 user_id 校验、空列表 422、目标分组归属校验）；管理页链接表复选框 + 全选 + 批量操作栏（删除/移动/公开/私密）与确认弹窗；pytest 59 passed，Playwright 批量设公开端到端通过
+- V16 标签管理页：`GET /api/tags`（按用户统计）、`PUT/DELETE /api/tags/{tag}`（重命名全量更新去重保序、删除；URL 编码中文标签；跨用户隔离）；设置页新增「标签管理」标签页（计数、行内重命名、删除确认）；pytest 65 passed，Playwright 重命名端到端通过
+- V17 重复检测：创建/编辑同名（NOCASE）或同 `url_lan` 返回 409 `{code:"duplicate", message}`（排除自身、`force:true` 强制保存）；前端 API 客户端解析结构化 detail，表单显示「已存在…」提示 + 「仍要保存」；pytest 70 passed，Playwright 409→强制保存端到端通过
+- V18 JSON 备份导出/导入：`GET /api/backup`（本人分组/链接/设置，管理员含 site_settings）；`POST /api/backup` 结构+URL 校验后追加导入（新 id 映射、设置 upsert、管理员站点设置 upsert）；个人设置页「数据备份」卡片（导出下载、JSON 文件导入）；pytest 76 passed，Playwright 导出→导入追加端到端通过
+- V19 自动快照备份：`app/snapshot.py` 在 `get_db` 提交后按 `conn.total_changes` 精确检测数据变更，写 `data/backups/snapshot-{ts}.json`（全量 groups/links/settings/site_settings），`PANEL_BACKUP_KEEP` 滚动清理；登录/只读不写；pytest 79 passed
+- V20 恢复向导：`GET /api/backup/snapshots`（管理员，快照预览条数）、`POST /api/backup/restore/{name}`（文件名白名单、快照行按 user_id 过滤后追加导入、管理员含 site_settings）；个人设置页自动快照列表 + 恢复确认弹窗；pytest 83 passed，Playwright 快照列表→恢复→追加导入端到端通过
+- V21 链接健康检查引擎：`app/health.py` 受控出站（`PANEL_HEALTH_CHECK`、HEAD 优先 405/501 回退 GET、5s 超时、BoundedSemaphore(4)、60s 缓存、<500 up）；`GET /api/health/links` 仅返回本人链接状态；pytest 89 passed（本地 fixture up/down/缓存/关闭/隔离）
+- V22 卡片状态点：`.status-dot-up/down` 语义色（复用 success/destructive 令牌）；`LinkCard` 状态点 + hover 毫秒 title；健康检查改为 ThreadPoolExecutor≤4 并发（面板秒级返回）；`connect(..., timeout=10)` + `PRAGMA busy_timeout=10000`；pytest 89 passed，Playwright 44 链接状态点全部渲染
+- V23 状态历史：`link_health` 表（每链接 10 分钟采样、24h/144 条滚动清理、跨用户隔离）；`GET /api/health/links/{id}/history`（404 防越权）；`HealthTrendModal` 趋势条弹层（绿/红 + 图例）；pytest 93 passed，Playwright 点状态点弹历史弹层通过
+- V24 时钟小组件：`DateTimeWidget` 本地时区秒级更新（路线图验收回填，实现于 `codex/frontend-display`）
+- V25 问候与「今天」常用入口：时间段问候（登录显示用户名）+ 当天打开快捷方式 chips（无当天记录回退最近使用）；Playwright 验证 chips 渲染
+- V26 RSS/ATOM 小组件：`app/rss.py`（≤3 源、8s 超时、并发 ≤3、10min 缓存、标准库 XML）；`rss_feeds` 用户设置（校验/上限）；`GET /api/rss`；个人设置页订阅管理、面板「订阅」折叠卡片；SQLite 改自动提交（`isolation_level=None`）+ `busy_timeout` 根治锁冲突；pytest 98 passed，Playwright 端到端通过
+- V27 公开状态页：`GET /api/health/status`（无鉴权但遵循 public_mode，仅 is_public 链接、健康检查复用并发/缓存）；访客面板状态点；pytest 100 passed，Playwright 访客 28 个公开链接状态点通过
+- V28 通知通道：`app/notify.py`（httpx POST 5s 超时、失败静默）；site_settings `notify_url/notify_enabled`（默认空/关，URL 校验）；`_record_samples` 采样时状态变化即通知（首次采样视为变化）；站点信息页通知设置卡片；pytest 103 passed（fixture：变化/同状态/关闭/失败忽略）
+- V29 检测配置中心：links 列 `health_enabled/health_interval/health_timeout/health_threshold`（SCHEMA + ALTER 迁移 + 备份导入携带）；健康引擎按链接配置执行（开关排除、自身间隔/超时、连续失败阈值 `fail_count`）；管理页链接表单健康检查配置组；pytest 106 passed
+- V30 状态导出 API：`GET /api/health/export?format=csv|json`（仅本人启用检测链接，CSV 含表头）；pytest 110 passed
+- V31 SSO 解绑：`GET /api/sso/status`、`DELETE /api/sso/identity`（本地密码确认、错密 403、未绑定 400、解绑不删本地账号）；个人设置页解绑弹窗；pytest 114 passed
+- V32 RP 发起登出：`GET /auth/sso/logout`（本地注销 + OIDC 发现 `end_session_endpoint` + `id_token_hint` + `post_logout_redirect_uri` 白名单 `PANEL_SSO_LOGOUT_REDIRECTS`）；sessions 新增 `sso_id_token`（ALTER 迁移）；pytest 117 passed
+- V33 回程登出：`POST /auth/sso/backchannel`（JSON/form 双格式；`OIDCClient.validate_logout_token` 验签 + iss/aud/exp/events；按 sessions.sso_sid + sso_identities.subject 精确删除，幂等）；pytest 123 passed
+- V34 Host 白名单：`PANEL_ALLOWED_HOSTS`（精确/`*.` 通配，为空放行）；security 中间件先校验 Host；pytest 126 passed
+- V35 登录锁定：`LoginLockout`（用户名+IP，`PANEL_LOGIN_MAX_FAILS`/`PANEL_LOGIN_LOCK_MINUTES`，成功重置，未知用户同行为）；登录接口 429；pytest 130 passed
+- V36 角色与权限：site_settings 写接口 admin-only（403），读公开；前端按角色过滤「站点信息」标签页；pytest 133 passed
+- V37 会话管理：`GET /api/sessions`（current 标记）、`DELETE /api/sessions/{id}`（当前拒绝 400、跨用户 404）、`DELETE /api/sessions`（吊销其他）；个人设置页会话卡片；pytest 138 passed
+- V38 审计日志：`audit_logs` 表 + `app/audit.py`（登录/登出/SSO 绑定解绑/备份恢复/站点设置变更，滚动 1000 条）；`GET /api/audit-logs` admin-only；pytest 142 passed
+- V39 安全响应头：CSP `font-src`、COOP/CORP same-origin、Permissions-Policy、HSTS 可配；pytest 144 passed
+- V40 密钥与上传加固：`PANEL_HOST_COOKIE`（`__Host-` 前缀，cookie 名全链路变量化）；上传魔数校验；生产 secret ≥32 启动校验；pytest 148 passed
+- V41 PWA 清单：`manifest.json`（standalone、主题色、512 maskable/any）、application-name、apple-touch-icon；构建产物含清单
+- V42 离线缓存外壳：`public/sw.js`（静态缓存优先、导航网络优先+离线回退、API 不缓存、版本化缓存清理）；生产注册；构建产物含 sw.js
+- V43/V44 i18n 与语言偏好：`lib/i18n.ts` + `locales/en-US.ts`（中文原文即 key、插值、useI18n）；主要页面迁移；语言选择双持久化（localStorage + 后端 `lang`）；pytest 149 passed，Playwright 英文界面通过
+- V45/V46 缓存与版本：`/assets/*` immutable 长期缓存、`X-Panel-Version`、`/api/health.version`、页脚版本、CHANGELOG
+- V47/V48 文档与前端测试：README 部署加固；vitest 13 passed（lib 层）
+- V49/V50 冒烟与性能：`scripts/smoke.sh` 全流程 PASS；`scripts/check-size.sh` 0.52MB 达标；pytest 151 passed；容器实测 46.5MiB / 3 进程
+
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
 - 后端：pytest 35 passed（认证/SSO/可见性/隔离/站点设置）

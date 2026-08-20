@@ -1,21 +1,41 @@
 import type { LinkOut } from "../api/types";
 import { ACCENT_CLASSES, accentFor } from "../lib/accent";
 import { recordRecent } from "../lib/recent";
+import { useI18n } from "../lib/i18n";
 
 export function LinkCard({
   link,
   listIndex,
   onActivate,
   onOpenModal,
+  draggable = false,
+  isDragOver = false,
+  status,
+  statusMs,
+  onStatusClick,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   link: LinkOut;
   listIndex?: number;
   onActivate?: (link: LinkOut) => void;
   onOpenModal?: (link: LinkOut) => void;
+  draggable?: boolean;
+  isDragOver?: boolean;
+  status?: "up" | "down" | "unknown";
+  statusMs?: number | null;
+  onStatusClick?: (link: LinkOut) => void;
+  onDragStart?: (link: LinkOut) => void;
+  onDragOver?: (link: LinkOut) => void;
+  onDrop?: (link: LinkOut) => void;
+  onDragEnd?: () => void;
 }) {
   const href = link.url ? link.url : `/go/${link.id}`;
   const isModal = link.open_mode === "modal";
   const target = link.open_mode === "new_tab" ? "_blank" : undefined;
+  const { t } = useI18n();
   const accent = ACCENT_CLASSES[accentFor(link.name)];
   const letter = link.name.trim().charAt(0).toUpperCase() || "?";
 
@@ -25,6 +45,33 @@ export function LinkCard({
       href={href}
       target={target}
       rel={target ? "noreferrer" : undefined}
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (event) => {
+              event.dataTransfer.effectAllowed = "move";
+              onDragStart?.(link);
+            }
+          : undefined
+      }
+      onDragOver={
+        draggable
+          ? (event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              onDragOver?.(link);
+            }
+          : undefined
+      }
+      onDrop={
+        draggable
+          ? (event) => {
+              event.preventDefault();
+              onDrop?.(link);
+            }
+          : undefined
+      }
+      onDragEnd={draggable ? onDragEnd : undefined}
       onClick={(event) => {
         recordRecent(link);
         onActivate?.(link);
@@ -33,7 +80,9 @@ export function LinkCard({
           onOpenModal?.(link);
         }
       }}
-      className="card card-interactive flex items-center gap-3 p-4"
+      className={`card card-interactive flex items-center gap-3 p-4 ${
+        draggable ? "cursor-grab select-none active:cursor-grabbing" : ""
+      } ${isDragOver ? "ring-2 ring-primary" : ""}`}
     >
       {link.icon_type === "upload" && link.icon_value ? (
         <img
@@ -61,6 +110,38 @@ export function LinkCard({
           </span>
         ) : null}
       </span>
+      {status ? (
+        <span
+          role="button"
+          tabIndex={-1}
+          aria-label={
+            status === "up"
+              ? t("在线")
+              : status === "down"
+                ? t("离线")
+                : t("状态未知")
+          }
+          title={
+            status === "up"
+              ? t("在线 · {ms}ms", { ms: statusMs ?? "" }) + t("（点击查看趋势）")
+              : status === "down"
+                ? t("离线") + t("（点击查看趋势）")
+                : t("状态未知")
+          }
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onStatusClick?.(link);
+          }}
+          className={`status-dot shrink-0 ${
+            status === "up"
+              ? "status-dot-up"
+              : status === "down"
+                ? "status-dot-down"
+                : ""
+          }`}
+        />
+      ) : null}
       <svg
         viewBox="0 0 24 24"
         fill="none"

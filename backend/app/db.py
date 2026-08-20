@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     token TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     sso_sid TEXT,
+    sso_id_token TEXT,
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     last_used_at TEXT
@@ -86,6 +87,10 @@ CREATE TABLE IF NOT EXISTS links (
     guest_url_mode TEXT NOT NULL DEFAULT 'hidden',
     sort_order INTEGER NOT NULL DEFAULT 0,
     open_mode TEXT NOT NULL DEFAULT 'new_tab',
+    health_enabled INTEGER NOT NULL DEFAULT 1,
+    health_interval INTEGER NOT NULL DEFAULT 10,
+    health_timeout REAL NOT NULL DEFAULT 5.0,
+    health_threshold INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_links_user ON links(user_id);
@@ -103,34 +108,109 @@ CREATE TABLE IF NOT EXISTS site_settings (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id, created_at);
+
+
+CREATE TABLE IF NOT EXISTS link_health (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL,
+    ms INTEGER NOT NULL DEFAULT 0,
+    fail_count INTEGER NOT NULL DEFAULT 0,
+    checked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_link_health_link ON link_health(link_id, checked_at);
 """
+
 
 
 def connect(path: Path) -> sqlite3.Connection:
     # FastAPI 同步依赖可能在不同线程池线程中执行，同一请求的连接串行使用，
     # 因此关闭 SQLite 的跨线程检查（每个请求拥有独立连接，无并发共享）。
-    conn = sqlite3.connect(path, check_same_thread=False)
+    # isolation_level=None → 自动提交：每个语句独立事务，锁窗口极小，
+    # 配合 WAL + busy_timeout 可避免多线程/多请求下的 "database is locked"。
+    conn = sqlite3.connect(path, check_same_thread=False, timeout=10, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=10000")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
 
+_SESSION_MIGRATIONS = [
+    "ALTER TABLE sessions ADD COLUMN sso_id_token TEXT",
+]
+
+_LINK_HEALTH_MIGRATIONS = [
+    "ALTER TABLE links ADD COLUMN health_enabled INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE links ADD COLUMN health_interval INTEGER NOT NULL DEFAULT 10",
+    "ALTER TABLE links ADD COLUMN health_timeout REAL NOT NULL DEFAULT 5.0",
+    "ALTER TABLE links ADD COLUMN health_threshold INTEGER NOT NULL DEFAULT 1",
+]
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    for statement in _SESSION_MIGRATIONS:
+        try:
+            conn.execute(statement)
+        except sqlite3.OperationalError:
+            pass
+    for statement in _LINK_HEALTH_MIGRATIONS:
+        try:
+            conn.execute(statement)
+        except sqlite3.OperationalError:
+            pass  # 已存在该列
     conn.commit()
 
 
+_DATA_MUTATION_PREFIXES = (
+    "/api/groups", "/api/links", "/api/tags", "/api/settings",
+    "/api/site-settings", "/api/backup",
+)
+
+
+def _maybe_write_snapshot(request: Request) -> None:
+    """数据变更提交并关闭请求连接后写自动快照（V19）。"""
+    if not request.url.path.startswith(_DATA_MUTATION_PREFIXES):
+        return
+    from app.snapshot import write_snapshot
+
+    settings = request.app.state.settings
+    write_snapshot(settings.data_dir, settings.db_path, settings.backup_keep)
+
+
 def get_db(request: Request) -> Iterator[sqlite3.Connection]:
-    """FastAPI 依赖：请求级 SQLite 连接，结束自动 commit/close。"""
+    """FastAPI 依赖：请求级 SQLite 连接，结束自动 commit/close。
+
+    提交成功后先关闭请求连接再写快照（避免两个连接重叠）；
+    异常路径 rollback 释放锁，防止连接泄漏。
+    """
     db_path: Path = request.app.state.db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
+    before = conn.total_changes
+    changed = False
     try:
         yield conn
         conn.commit()
+        changed = conn.total_changes > before
+    except BaseException:
+        conn.rollback()
+        raise
     finally:
         conn.close()
+    if changed:
+        _maybe_write_snapshot(request)
 
 
 def count_users(conn: sqlite3.Connection) -> int:

@@ -5,6 +5,7 @@ import hashlib
 import os
 import secrets
 import sqlite3
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -67,15 +68,16 @@ def create_session(
     conn: sqlite3.Connection,
     user_id: int,
     sso_sid: str | None = None,
+    sso_id_token: str | None = None,
     session_days: int = 30,
 ) -> str:
     token = new_token()
     now = _now_utc()
     expires = now + timedelta(days=session_days)
     conn.execute(
-        "INSERT INTO sessions (token, user_id, sso_sid, expires_at, created_at, last_used_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (token, user_id, sso_sid, _fmt(expires), _fmt(now), _fmt(now)),
+        "INSERT INTO sessions (token, user_id, sso_sid, sso_id_token, expires_at, created_at, last_used_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (token, user_id, sso_sid, sso_id_token, _fmt(expires), _fmt(now), _fmt(now)),
     )
     return token
 
@@ -93,6 +95,45 @@ def get_session_user(
 
 def delete_session(conn: sqlite3.Connection, token: str) -> None:
     conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+
+class LoginLockout:
+    """每用户名+IP 连续失败锁定（内存实现，时间戳单调时钟）。"""
+
+    def __init__(self, max_fails: int = 5, lock_minutes: int = 15):
+        self.max_fails = max_fails
+        self.lock_seconds = lock_minutes * 60
+        self._state: dict[str, tuple[int, float]] = {}
+        self._lock = threading.Lock()
+
+    def _key(self, username: str, ip: str) -> str:
+        return f"{username.lower()}|{ip}"
+
+    def is_locked(self, username: str, ip: str) -> bool:
+        with self._lock:
+            entry = self._state.get(self._key(username, ip))
+            if entry is None:
+                return False
+            fails, locked_until = entry
+            if locked_until > 0 and time.monotonic() < locked_until:
+                return True
+            return fails >= self.max_fails
+
+    def record_failure(self, username: str, ip: str) -> None:
+        key = self._key(username, ip)
+        with self._lock:
+            fails, locked_until = self._state.get(key, (0, 0.0))
+            fails += 1
+            locked_until = (
+                time.monotonic() + self.lock_seconds
+                if fails >= self.max_fails
+                else 0.0
+            )
+            self._state[key] = (fails, locked_until)
+
+    def record_success(self, username: str, ip: str) -> None:
+        with self._lock:
+            self._state.pop(self._key(username, ip), None)
 
 
 class RateLimiter:

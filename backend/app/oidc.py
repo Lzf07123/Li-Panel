@@ -131,6 +131,35 @@ class OIDCClient:
         self._jwks_cache = (time.monotonic(), data)
         return data
 
+    def validate_logout_token(self, logout_token: str) -> dict:
+        """回程登出令牌校验：验签 + iss/aud/exp + backchannel-logout 事件。"""
+        jwks = self.jwks()
+        try:
+            headers = jwt.get_unverified_header(logout_token)
+            kid = headers.get("kid")
+            key = None
+            for jwk in jwks.get("keys", []):
+                if jwk.get("kid") == kid:
+                    key = RSAAlgorithm.from_jwk(jwk)
+                    break
+            if key is None:
+                raise OIDCError("invalid_token", "找不到匹配的 JWKS 公钥")
+            claims = jwt.decode(
+                logout_token,
+                key=key,
+                algorithms=["RS256"],
+                audience=self.settings.oidc_client_id,
+                issuer=self.settings.oidc_issuer,
+                options={"require": ["exp", "iss", "aud", "events"]},
+            )
+        except jwt.PyJWTError as exc:
+            raise OIDCError("invalid_token", f"logout_token 校验失败: {exc}") from exc
+        if "http://schemas.openid.net/event/backchannel-logout" not in (
+            claims.get("events") or {}
+        ):
+            raise OIDCError("invalid_token", "缺少 backchannel-logout 事件")
+        return claims
+
     def validate_id_token(
         self, id_token: str, nonce: str, access_token: str, jwks: dict
     ) -> dict:

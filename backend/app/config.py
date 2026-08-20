@@ -35,6 +35,19 @@ class Settings:
     oidc_client_id: str | None
     oidc_client_secret: str | None
     oidc_redirect_uri: str | None
+    link_icon_fetch: bool
+    backup_keep: int
+    health_check: bool
+    sso_logout_redirects: tuple[str, ...]
+    allowed_hosts: tuple[str, ...]
+    login_max_fails: int
+    login_lock_minutes: int
+    hsts: bool
+    host_cookie: bool
+
+    @property
+    def session_cookie(self) -> str:
+        return "__Host-lipanel_session" if self.host_cookie else "lipanel_session"
 
     @property
     def db_path(self) -> Path:
@@ -79,4 +92,35 @@ def load_settings(overrides: dict | None = None) -> Settings:
         oidc_client_id=val("oidc_client_id", "OIDC_CLIENT_ID", None),
         oidc_client_secret=val("oidc_client_secret", "OIDC_CLIENT_SECRET", None),
         oidc_redirect_uri=val("oidc_redirect_uri", "OIDC_REDIRECT_URI", None),
+        link_icon_fetch=flag("link_icon_fetch", "PANEL_LINK_ICON_FETCH", True),
+        backup_keep=int(o["backup_keep"])
+        if "backup_keep" in o
+        else _env_int("PANEL_BACKUP_KEEP", 10),
+        health_check=flag("health_check", "PANEL_HEALTH_CHECK", True),
+        sso_logout_redirects=(
+            tuple(str(x) for x in o["sso_logout_redirects"])
+            if "sso_logout_redirects" in o
+            else tuple(
+                part.strip()
+                for part in os.getenv("PANEL_SSO_LOGOUT_REDIRECTS", "").split(",")
+                if part.strip()
+            )
+        ),
+        allowed_hosts=(
+            tuple(str(x) for x in o["allowed_hosts"])
+            if "allowed_hosts" in o
+            else tuple(
+                part.strip()
+                for part in os.getenv("PANEL_ALLOWED_HOSTS", "").split(",")
+                if part.strip()
+            )
+        ),
+        login_max_fails=int(o["login_max_fails"])
+        if "login_max_fails" in o
+        else _env_int("PANEL_LOGIN_MAX_FAILS", 5),
+        login_lock_minutes=int(o["login_lock_minutes"])
+        if "login_lock_minutes" in o
+        else _env_int("PANEL_LOGIN_LOCK_MINUTES", 15),
+        hsts=flag("hsts", "PANEL_HSTS", False),
+        host_cookie=flag("host_cookie", "PANEL_HOST_COOKIE", False),
     )

@@ -84,6 +84,14 @@ Li&Panel/
 └── .env.example
 ```
 
+## 部署加固（V47）
+
+- **镜像版本钉扎**：生产构建请将 `compose.yaml` 中 `image: lipanel:local` 改为固定版本（如 `lipanel:0.1.0`），避免意外覆盖；`.env.example` 已给出全部可配变量。
+- **反向代理 HTTPS**：容器默认 HTTP（`PANEL_COOKIE_SECURE=false`）。经 Nginx/Caddy 终止 TLS 时设置 `PANEL_COOKIE_SECURE=true`，并配置 `X-Forwarded-Proto`/`X-Forwarded-Host` 透传；HTTPS 部署建议开启 `PANEL_HSTS=true`。
+- **Host 白名单**：设置 `PANEL_ALLOWED_HOSTS=panel.example.com,*.example.com` 防 DNS rebinding；为空则放行。
+- **备份恢复演练**：数据在 `./data`（挂载卷）。定期在管理页「个人设置 → 数据备份」导出 JSON 并异地保存；演练流程：导出 → 清空数据目录 → 重新初始化 → 导入备份 → 核对分组/链接数量与公开可见性。
+- **`PANEL_SECRET_KEY` 轮换**：生产要求 ≥32 字符随机串；轮换会使现有会话失效（需重新登录），建议在低峰期操作，并先备份数据。
+
 ## 许可
 
 © 2026 Li&Panel。保留所有权利。
