@@ -8,6 +8,7 @@ import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
 import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
+import { DateTimeWidget } from "../components/DateTimeWidget";
 import { LinkCard } from "../components/LinkCard";
 import { LinkPreviewModal } from "../components/LinkPreviewModal";
 import { PageSkeleton } from "../components/PageSkeleton";
@@ -223,6 +224,7 @@ export function PanelPage() {
         >
           {site ? (
             <section className="mb-10 flex flex-col items-center gap-3 text-center">
+              <DateTimeWidget username={me?.user.username} />
               <Brand className="brand-halo h-14 w-14" />
               <h1 className="text-3xl font-bold tracking-tight text-foreground">
                 <BlurText
@@ -378,6 +380,9 @@ export function PanelPage() {
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-muted">
                   <span className="h-px w-4 bg-border" />
                   最近使用
+                  <span className="text-xs font-normal text-muted/80">
+                    · {recentLinks.length}
+                  </span>
                 </h2>
                 <button
                   type="button"
@@ -418,6 +423,9 @@ export function PanelPage() {
                 >
                   <span className="h-px w-4 bg-border" />
                   {group.name}
+                  <span className="text-xs font-normal text-muted/80">
+                    · {group.links.length}
+                  </span>
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
@@ -459,6 +467,9 @@ export function PanelPage() {
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
                 <span className="h-px w-4 bg-border" />
                 未分组
+                <span className="text-xs font-normal text-muted/80">
+                  · {ungrouped.length}
+                </span>
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {ungrouped.map((link) => (
