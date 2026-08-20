@@ -144,7 +144,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def spa_fallback(path: str) -> FileResponse:
         if path.startswith(("api/", "auth/", "go/", "uploads/", "favicons/")):
             raise HTTPException(status_code=404)
-        candidate = FRONTEND_DIST / path
+        # 防路径穿越：拒绝反斜杠与任何 ".." 段（浏览器会把 \ 规范化为 /）
+        if "\\" in path or any(part == ".." for part in path.split("/")):
+            raise HTTPException(status_code=404)
+        candidate = (FRONTEND_DIST / path).resolve()
+        if not candidate.is_relative_to(FRONTEND_DIST.resolve()):
+            raise HTTPException(status_code=404)
         if candidate.is_file():
             return FileResponse(candidate)
         index = FRONTEND_DIST / "index.html"

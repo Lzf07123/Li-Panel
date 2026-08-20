@@ -25,7 +25,7 @@ class UnbindIn(BaseModel):
 
 def _safe_logout_redirect(value: str, settings) -> str:
     """回跳白名单：环境变量 PANEL_SSO_LOGOUT_REDIRECTS；为空仅允许站内相对路径。"""
-    if value.startswith("/") and not value.startswith("//"):
+    if value.startswith("/") and not value.startswith("//") and "\\" not in value:
         return value
     if value in settings.sso_logout_redirects:
         return value
@@ -75,7 +75,6 @@ async def sso_backchannel(
 @router.get("/auth/sso/logout")
 def sso_logout(
     request: Request,
-    lipanel_session: Annotated[str | None, Cookie()] = None,
     conn: sqlite3.Connection = Depends(get_db),
     redirect_after: str = "/",
 ) -> RedirectResponse:
@@ -84,13 +83,14 @@ def sso_logout(
     target = _safe_logout_redirect(redirect_after, settings)
 
     id_token: str | None = None
-    if lipanel_session:
+    session_token = request.cookies.get(settings.session_cookie)
+    if session_token:
         row = conn.execute(
-            "SELECT sso_id_token FROM sessions WHERE token = ?", (lipanel_session,)
+            "SELECT sso_id_token FROM sessions WHERE token = ?", (session_token,)
         ).fetchone()
         if row is not None:
             id_token = row["sso_id_token"]
-        delete_session(conn, lipanel_session)
+        delete_session(conn, session_token)
 
     if not settings.oidc_enabled or not (
         settings.oidc_issuer
@@ -279,7 +279,7 @@ def sso_callback(
         write_audit(conn, identity["user_id"], "sso_login", subject)
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(
-            "lipanel_session",
+            settings.session_cookie,
             session_token,
             max_age=settings.session_days * 86400,
             httponly=True,
@@ -415,7 +415,11 @@ def logout_uri(
     target = next or "/"
     parsed = urlparse(target)
     host = request.headers.get("host", "").split(":")[0]
-    if target.startswith("//") or parsed.scheme not in {"", "http", "https"}:
+    if (
+        "\\" in target
+        or target.startswith("//")
+        or parsed.scheme not in {"", "http", "https"}
+    ):
         target = "/"
     elif parsed.netloc and parsed.hostname != host:
         target = "/"

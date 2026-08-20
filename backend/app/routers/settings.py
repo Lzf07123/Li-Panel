@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from app.brand_defaults import get_site_settings
 from app.db import get_db
 from app.audit import write_audit
-from app.deps import current_user
+from app.deps import current_user, optional_user
 from app.rss import MAX_FEEDS, allowed_url
 
 router = APIRouter(tags=["settings"])
@@ -64,9 +64,15 @@ class SiteSettingsIn(BaseModel):
 
 @router.get("/api/site-settings")
 def site_settings_get(
+    user: sqlite3.Row | None = Depends(optional_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
-    return get_site_settings(conn)
+    data = get_site_settings(conn)
+    # notify_url 是通知 webhook 地址，视为敏感配置：仅管理员可见
+    if user is None or user["role"] != "admin":
+        data.pop("notify_url", None)
+        data.pop("notify_enabled", None)
+    return data
 
 
 @router.put("/api/site-settings")

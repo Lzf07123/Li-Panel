@@ -75,3 +75,25 @@ def test_filing_settings_roundtrip(client, auth_headers):
     panel = client.get("/api/panel", headers=auth_headers).json()
     assert panel["site"]["icp"] == payload["icp"]
     assert panel["site"]["police_text"] == payload["police_text"]
+
+
+def test_notify_url_admin_only(client, auth_headers):
+    """上线前修复：通知 webhook 属敏感配置，仅管理员可见。"""
+    r = client.put(
+        "/api/site-settings",
+        json={"notify_url": "https://hooks.example.com/secret", "notify_enabled": True},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    # 管理员可见
+    r = client.get("/api/site-settings", headers=auth_headers)
+    assert r.json()["notify_url"] == "https://hooks.example.com/secret"
+    # 访客不可见（清空登录态 cookie jar）
+    client.cookies.clear()
+    r = client.get("/api/site-settings")
+    assert "notify_url" not in r.json()
+    assert "notify_enabled" not in r.json()
+    # 访客面板也不下发
+    r = client.get("/api/panel")
+    assert "notify_url" not in r.json()["site"]
+    assert "notify_enabled" not in r.json()["site"]

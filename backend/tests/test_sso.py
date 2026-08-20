@@ -210,3 +210,74 @@ def test_sso_unbind_not_bound(client, auth_headers):
         "DELETE", "/api/sso/identity", json={"password": "secret123"}, headers=auth_headers
     )
     assert r.status_code == 400
+
+
+def test_sso_host_cookie_used_everywhere(tmp_path, monkeypatch):
+    """上线前修复：开启 PANEL_HOST_COOKIE 后，SSO 回调/登出也必须使用 __Host- 前缀会话 Cookie。"""
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(oidc_mod, "OIDCClient", FakeOIDCClient)
+    settings = load_settings(
+        overrides={
+            "data_dir": str(tmp_path),
+            "secret_key": "test",
+            "public_mode": True,
+            "host_cookie": True,
+            "cookie_secure": True,
+            "oidc_enabled": True,
+            "oidc_issuer": ISSUER,
+            "oidc_client_id": "client1",
+            "oidc_redirect_uri": "http://testserver/auth/sso/callback",
+        }
+    )
+    c = TestClient(create_app(settings))
+    assert c.post("/api/setup", json={"username": "admin", "password": "secret123"}).status_code == 201
+
+    # 首次回调进入关联页
+    flow_cookie, state = _start_flow(c)
+    cb = c.get(
+        f"/auth/sso/callback?code=code&state={state}",
+        headers={"Cookie": f"lipanel_sso_flow={flow_cookie}"},
+        follow_redirects=False,
+    )
+    assert cb.status_code == 302 and cb.headers["location"].endswith("/sso/link")
+    # 绑定已有账号 → 会话 Cookie 使用 __Host- 前缀
+    r = c.post(
+        "/api/sso/link",
+        json={"action": "bind", "username": "admin", "password": "secret123"},
+        headers={"Cookie": f"lipanel_sso_flow={flow_cookie}"},
+    )
+    assert r.status_code == 200
+    host_cookie = r.cookies["__Host-lipanel_session"]
+    assert c.get("/api/auth/me", headers={"Cookie": f"__Host-lipanel_session={host_cookie}"}).status_code == 200
+    assert c.get("/api/auth/me", headers={"Cookie": f"lipanel_session={host_cookie}"}).status_code == 401
+
+    # 已绑定身份再次回调 → 自动登录也必须写 __Host- 前缀
+    flow_cookie2, state2 = _start_flow(c)
+    cb2 = c.get(
+        f"/auth/sso/callback?code=code&state={state2}",
+        headers={"Cookie": f"lipanel_sso_flow={flow_cookie2}"},
+        follow_redirects=False,
+    )
+    assert cb2.status_code == 302
+    assert "__Host-lipanel_session" in cb2.headers["set-cookie"]
+    auto_cookie = cb2.cookies["__Host-lipanel_session"]
+    assert c.get("/api/auth/me", headers={"Cookie": f"__Host-lipanel_session={auto_cookie}"}).status_code == 200
+
+    # RP 发起登出按配置的 Cookie 名读取并注销会话
+    r = c.get(
+        "/auth/sso/logout",
+        headers={"Cookie": f"__Host-lipanel_session={auto_cookie}"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 302
+    assert c.get("/api/auth/me", headers={"Cookie": f"__Host-lipanel_session={auto_cookie}"}).status_code == 401
+
+
+def test_logout_uri_rejects_backslash(client):
+    """上线前修复：next 含反斜杠一律回站内，防浏览器 \\→/ 规范化导致开放跳转。"""
+    r = client.get("/auth/logout?next=/\\evil.example.com", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "/"
+    r = client.get("/auth/logout?next=//evil.example.com", follow_redirects=False)
+    assert r.headers["location"] == "/"
