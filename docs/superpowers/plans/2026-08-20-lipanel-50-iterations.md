@@ -146,5 +146,7 @@
 - ✅ V17（重复检测）：2026-08-21 完成。创建/编辑同名或同 URL 返回 409（结构化 `{code,message}`，忽略自身、大小写不敏感），`force=true` 可强制保存；前端表单显示提示 + 「仍要保存」。pytest 70 passed；Playwright 端到端：409 → 提示 → 强制保存 201。
 - ✅ V18（JSON 备份导出/导入）：2026-08-21 完成。`GET/POST /api/backup`（分组/链接/个人设置；管理员含站点设置；导入校验 URL/结构后追加，不删除现有数据）；个人设置页「数据备份」导出下载/导入合并。pytest 76 passed；Playwright 端到端：导出 3 组/11 链接 → 导入后 6 组/22 链接。
 - ✅ V19（自动快照备份）：2026-08-21 完成。数据接口提交后（`total_changes` 精确检测）写 `data/backups/snapshot-*.json`，`PANEL_BACKUP_KEEP`（默认 10）滚动清理；登录等非数据请求不写。pytest 79 passed。
-- ⬜ V20–V50：待执行；每版独立提交。
+- ✅ V20（恢复向导）：2026-08-21 完成。`GET /api/backup/snapshots` 预览条数（管理员）、`POST /api/backup/restore/{name}` 快照追加恢复（文件名白名单、按 user_id 过滤、管理员含站点设置）；个人设置页快照列表 + 确认弹窗。pytest 83 passed；Playwright 端到端：快照列表 → 恢复 → 链接 22→44。
+- ✅ Phase B（V11–V20）全部完成：2026-08-21，提交范围 `6f01ab3`（V11）→ `待填`（V20）。
+- ⬜ Phase C（V21–V30）：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

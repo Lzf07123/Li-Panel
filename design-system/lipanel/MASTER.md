@@ -79,6 +79,7 @@
 - V17 重复检测：创建/编辑同名（NOCASE）或同 `url_lan` 返回 409 `{code:"duplicate", message}`（排除自身、`force:true` 强制保存）；前端 API 客户端解析结构化 detail，表单显示「已存在…」提示 + 「仍要保存」；pytest 70 passed，Playwright 409→强制保存端到端通过
 - V18 JSON 备份导出/导入：`GET /api/backup`（本人分组/链接/设置，管理员含 site_settings）；`POST /api/backup` 结构+URL 校验后追加导入（新 id 映射、设置 upsert、管理员站点设置 upsert）；个人设置页「数据备份」卡片（导出下载、JSON 文件导入）；pytest 76 passed，Playwright 导出→导入追加端到端通过
 - V19 自动快照备份：`app/snapshot.py` 在 `get_db` 提交后按 `conn.total_changes` 精确检测数据变更，写 `data/backups/snapshot-{ts}.json`（全量 groups/links/settings/site_settings），`PANEL_BACKUP_KEEP` 滚动清理；登录/只读不写；pytest 79 passed
+- V20 恢复向导：`GET /api/backup/snapshots`（管理员，快照预览条数）、`POST /api/backup/restore/{name}`（文件名白名单、快照行按 user_id 过滤后追加导入、管理员含 site_settings）；个人设置页自动快照列表 + 恢复确认弹窗；pytest 83 passed，Playwright 快照列表→恢复→追加导入端到端通过
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

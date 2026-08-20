@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.db import get_db
@@ -14,6 +15,7 @@ from app.deps import current_user
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
 BACKUP_VERSION = 1
+SNAPSHOT_NAME_RE = re.compile(r"^snapshot-[A-Za-z0-9._-]+\.json$")
 
 LINK_FIELDS = [
     "name", "url_lan", "url_wan", "icon_type", "icon_value",
@@ -26,46 +28,6 @@ def _is_http_url(value: object) -> bool:
         return False
     parsed = urlparse(value)
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
-
-
-@router.get("")
-def export_backup(
-    user: sqlite3.Row = Depends(current_user),
-    conn: sqlite3.Connection = Depends(get_db),
-) -> JSONResponse:
-    groups = [
-        dict(r)
-        for r in conn.execute(
-            "SELECT * FROM groups WHERE user_id = ? ORDER BY sort_order, id",
-            (user["id"],),
-        ).fetchall()
-    ]
-    links = [
-        dict(r)
-        for r in conn.execute(
-            "SELECT * FROM links WHERE user_id = ? ORDER BY sort_order, id",
-            (user["id"],),
-        ).fetchall()
-    ]
-    settings = {
-        row["key"]: row["value"]
-        for row in conn.execute(
-            "SELECT key, value FROM settings WHERE user_id = ?", (user["id"],)
-        ).fetchall()
-    }
-    payload: dict = {
-        "version": BACKUP_VERSION,
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-        "groups": groups,
-        "links": links,
-        "settings": settings,
-    }
-    if user["role"] == "admin":
-        payload["site_settings"] = {
-            row["key"]: row["value"]
-            for row in conn.execute("SELECT key, value FROM site_settings").fetchall()
-        }
-    return JSONResponse(payload)
 
 
 def _validate_backup(data: object) -> dict:
@@ -94,15 +56,10 @@ def _validate_backup(data: object) -> dict:
     return data
 
 
-@router.post("", status_code=201)
-def import_backup(
-    payload: dict = Body(...),
-    user: sqlite3.Row = Depends(current_user),
-    conn: sqlite3.Connection = Depends(get_db),
+def _apply_backup(
+    conn: sqlite3.Connection, user: sqlite3.Row, data: dict
 ) -> dict:
-    """导入校验后追加：不删除/覆盖现有数据；分组与链接按新 id 落库。"""
-    data = _validate_backup(payload)
-
+    """追加导入：不删除/覆盖现有数据；分组与链接按新 id 落库。"""
     max_sort = conn.execute(
         "SELECT COALESCE(MAX(sort_order), -1) AS m FROM groups WHERE user_id = ?",
         (user["id"],),
@@ -186,10 +143,136 @@ def import_backup(
             imported_site += 1
 
     return {
-        "imported": {
-            "groups": len(data.get("groups", [])),
-            "links": imported_links,
-            "settings": imported_settings,
-            "site_settings": imported_site,
-        }
+        "groups": len(data.get("groups", [])),
+        "links": imported_links,
+        "settings": imported_settings,
+        "site_settings": imported_site,
     }
+
+
+@router.get("")
+def export_backup(
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> JSONResponse:
+    groups = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM groups WHERE user_id = ? ORDER BY sort_order, id",
+            (user["id"],),
+        ).fetchall()
+    ]
+    links = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM links WHERE user_id = ? ORDER BY sort_order, id",
+            (user["id"],),
+        ).fetchall()
+    ]
+    settings = {
+        row["key"]: row["value"]
+        for row in conn.execute(
+            "SELECT key, value FROM settings WHERE user_id = ?", (user["id"],)
+        ).fetchall()
+    }
+    payload: dict = {
+        "version": BACKUP_VERSION,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "groups": groups,
+        "links": links,
+        "settings": settings,
+    }
+    if user["role"] == "admin":
+        payload["site_settings"] = {
+            row["key"]: row["value"]
+            for row in conn.execute("SELECT key, value FROM site_settings").fetchall()
+        }
+    return JSONResponse(payload)
+
+
+@router.post("", status_code=201)
+def import_backup(
+    payload: dict = Body(...),
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    data = _validate_backup(payload)
+    return {"imported": _apply_backup(conn, user, data)}
+
+
+@router.get("/snapshots")
+def list_snapshots(
+    request: Request,
+    user: sqlite3.Row = Depends(current_user),
+) -> list[dict]:
+    """恢复向导：快照预览条数（管理员）。"""
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可查看快照")
+    backup_dir = request.app.state.settings.data_dir / "backups"
+    if not backup_dir.exists():
+        return []
+    result: list[dict] = []
+    for path in sorted(backup_dir.glob("snapshot-*.json"), reverse=True):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        result.append(
+            {
+                "name": path.name,
+                "created_at": data.get("created_at"),
+                "groups": len(data.get("groups", [])),
+                "links": len(data.get("links", [])),
+                "settings": len(data.get("settings", [])),
+                "site_settings": len(data.get("site_settings", {})),
+            }
+        )
+    return result
+
+
+def _snapshot_to_payload(data: dict, user_id: int) -> dict:
+    """快照是全量行（含 user_id），恢复时只取当前用户的子集并转为导入格式。"""
+    groups = [
+        g for g in data.get("groups", [])
+        if isinstance(g, dict) and g.get("user_id") == user_id
+    ]
+    links = [
+        l for l in data.get("links", [])
+        if isinstance(l, dict) and l.get("user_id") == user_id
+    ]
+    settings = {
+        row["key"]: row["value"]
+        for row in data.get("settings", [])
+        if isinstance(row, dict)
+        and row.get("user_id") == user_id
+        and isinstance(row.get("key"), str)
+    }
+    site = {
+        row["key"]: row["value"]
+        for row in data.get("site_settings", [])
+        if isinstance(row, dict) and isinstance(row.get("key"), str)
+    }
+    return {"groups": groups, "links": links, "settings": settings, "site_settings": site}
+
+
+@router.post("/restore/{name}", status_code=201)
+def restore_snapshot(
+    name: str,
+    request: Request,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """从快照文件恢复（追加导入，仅当前用户数据；管理员含站点设置）。"""
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可恢复快照")
+    if not SNAPSHOT_NAME_RE.fullmatch(name):
+        raise HTTPException(status_code=400, detail="快照名称不合法")
+    path = request.app.state.settings.data_dir / "backups" / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="快照不存在")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(status_code=400, detail="快照文件损坏")
+    payload = _snapshot_to_payload(data, user["id"])
+    return {"restored": _apply_backup(conn, user, payload)}

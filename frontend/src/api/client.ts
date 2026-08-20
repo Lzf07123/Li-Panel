@@ -192,6 +192,22 @@ export const backupApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  listSnapshots: () =>
+    api<
+      {
+        name: string;
+        created_at?: string;
+        groups: number;
+        links: number;
+        settings: number;
+        site_settings: number;
+      }[]
+    >("/api/backup/snapshots"),
+  restore: (name: string) =>
+    api<{ restored: Record<string, number> }>(
+      `/api/backup/restore/${encodeURIComponent(name)}`,
+      { method: "POST" },
+    ),
 };
 
 export const settingsApi = {

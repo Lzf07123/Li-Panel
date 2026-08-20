@@ -62,6 +62,17 @@ export function SettingsPage() {
   const [renameValue, setRenameValue] = useState("");
   const [deleteTagName, setDeleteTagName] = useState<string | null>(null);
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<
+    {
+      name: string;
+      created_at?: string;
+      groups: number;
+      links: number;
+      settings: number;
+      site_settings: number;
+    }[]
+  >([]);
+  const [restoreName, setRestoreName] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
 
@@ -99,6 +110,10 @@ export function SettingsPage() {
           if (settings.link_mode) setLinkMode(settings.link_mode);
         })
         .catch(() => undefined);
+      backupApi
+        .listSnapshots()
+        .then(setSnapshots)
+        .catch(() => setSnapshots([]));
     }
   }, [tab]);
 
@@ -173,6 +188,19 @@ export function SettingsPage() {
     },
     { onError: (err) => setError(err.message) },
   );
+
+  const restoreSnapshotAction = useAsyncAction(async () => {
+    if (restoreName === null) return;
+    const result = await backupApi.restore(restoreName);
+    const counts = result.restored;
+    setRestoreName(null);
+    setGroups(await groupsApi.list());
+    setLinks(await linksApi.list());
+    setSnapshots(await backupApi.listSnapshots());
+    toast.success(
+      `已恢复：分组 ${counts.groups}、链接 ${counts.links}、设置 ${counts.settings}、站点 ${counts.site_settings}`,
+    );
+  }, { onError: (err) => setError(err.message) });
 
   const exportBackupAction = useAsyncAction(async () => {
     const data = await backupApi.export();
@@ -1174,6 +1202,33 @@ export function SettingsPage() {
                       />
                     </label>
                   </div>
+                  {snapshots.length > 0 ? (
+                    <div className="mt-4">
+                      <p className="text-xs font-medium text-muted">自动快照</p>
+                      <ul className="mt-2 max-h-48 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                        {snapshots.map((snap) => (
+                          <li
+                            key={snap.name}
+                            className="flex items-center gap-2 px-3 py-2 text-xs"
+                          >
+                            <span className="min-w-0 truncate font-mono text-muted">
+                              {snap.created_at ?? snap.name}
+                            </span>
+                            <span className="shrink-0 text-muted">
+                              {snap.groups} 组 / {snap.links} 链接
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-ghost ml-auto h-7 shrink-0 px-2 text-xs"
+                              onClick={() => setRestoreName(snap.name)}
+                            >
+                              恢复
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -1192,6 +1247,15 @@ export function SettingsPage() {
           if (deleteGroupId !== null) void deleteGroupAction.run(deleteGroupId);
         }}
         onCancel={() => setDeleteGroupId(null)}
+      />
+      <ConfirmDialog
+        open={restoreName !== null}
+        title="从快照恢复"
+        message="恢复为追加导入（不会删除现有数据），确定继续？"
+        confirmLabel="恢复"
+        status={restoreSnapshotAction.status}
+        onConfirm={() => void restoreSnapshotAction.run()}
+        onCancel={() => setRestoreName(null)}
       />
       <ConfirmDialog
         open={deleteTagName !== null}
