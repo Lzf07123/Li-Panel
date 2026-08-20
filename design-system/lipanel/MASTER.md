@@ -101,6 +101,7 @@
 - V39 安全响应头：CSP `font-src`、COOP/CORP same-origin、Permissions-Policy、HSTS 可配；pytest 144 passed
 - V40 密钥与上传加固：`PANEL_HOST_COOKIE`（`__Host-` 前缀，cookie 名全链路变量化）；上传魔数校验；生产 secret ≥32 启动校验；pytest 148 passed
 - V41 PWA 清单：`manifest.json`（standalone、主题色、512 maskable/any）、application-name、apple-touch-icon；构建产物含清单
+- V42 离线缓存外壳：`public/sw.js`（静态缓存优先、导航网络优先+离线回退、API 不缓存、版本化缓存清理）；生产注册；构建产物含 sw.js
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
