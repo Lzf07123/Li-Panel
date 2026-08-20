@@ -1,7 +1,11 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { AppHeader } from "../components/AppHeader";
+import { AuroraBackground } from "../components/AuroraBackground";
+import { ConfirmDialog } from "../components/Modal";
+import { ScrollTabs } from "../components/ScrollTabs";
 import { TechAmbience } from "../components/TechAmbience";
+import { useToast } from "../components/Toast";
 import {
   api,
   ApiError,
@@ -35,7 +39,9 @@ export function SettingsPage() {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupPublic, setNewGroupPublic] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
+  const [deleteGroupId, setDeleteGroupId] = useState<number | null>(null);
+  const [deleteLinkId, setDeleteLinkId] = useState<number | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     api
@@ -60,11 +66,6 @@ export function SettingsPage() {
     }
   }, [tab]);
 
-  const flash = (message: string) => {
-    setSaved(message);
-    window.setTimeout(() => setSaved(""), 2500);
-  };
-
   const saveSite = async (event: FormEvent) => {
     event.preventDefault();
     if (!site) return;
@@ -81,7 +82,7 @@ export function SettingsPage() {
         public_mode: site.public_mode === "true",
       });
       setSite(next);
-      flash("站点信息已保存");
+      toast("success", "站点信息已保存");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "保存失败");
     }
@@ -89,10 +90,11 @@ export function SettingsPage() {
 
   const uploadImage = async (field: "logo" | "favicon", file: File | undefined) => {
     if (!file || !site) return;
+    setError("");
     try {
       const { url } = await api.upload(file);
       setSite({ ...site, [field]: url });
-      flash("图片已上传，记得保存");
+      toast("success", "图片已上传，记得保存");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "上传失败");
     }
@@ -107,30 +109,34 @@ export function SettingsPage() {
       setNewGroupName("");
       setNewGroupPublic(false);
       setGroups(await api.listGroups());
-      flash("分组已创建");
+      toast("success", "分组已创建");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "创建失败");
     }
   };
 
   const toggleGroup = async (group: GroupRow) => {
+    setError("");
     try {
       await api.updateGroup(group.id, { name: group.name, is_public: !group.is_public });
       setGroups(await api.listGroups());
-      flash(`「${group.name}」已${!group.is_public ? "公开" : "私密"}`);
+      toast("success", `「${group.name}」已${group.is_public ? "私密" : "公开"}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "修改失败");
     }
   };
 
-  const removeGroup = async (id: number) => {
-    if (!window.confirm("删除分组？链接将保留为未分组。")) return;
+  const confirmDeleteGroup = async () => {
+    if (deleteGroupId === null) return;
+    setError("");
     try {
-      await api.deleteGroup(id);
+      await api.deleteGroup(deleteGroupId);
       setGroups(await api.listGroups());
+      toast("success", "分组已删除，链接保留为未分组");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "删除失败");
     }
+    setDeleteGroupId(null);
   };
 
   const saveLink = async (event: FormEvent) => {
@@ -154,7 +160,7 @@ export function SettingsPage() {
       }
       setLinkForm(emptyLinkForm);
       setLinks(await api.listLinks());
-      flash("快捷方式已保存");
+      toast("success", "快捷方式已保存");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "保存失败");
     }
@@ -175,6 +181,7 @@ export function SettingsPage() {
   };
 
   const toggleLinkPublic = async (link: LinkItem) => {
+    setError("");
     try {
       await api.updateLink(link.id, {
         name: link.name,
@@ -183,26 +190,30 @@ export function SettingsPage() {
         guest_url_mode: link.guest_url_mode ?? "hidden",
       });
       setLinks(await api.listLinks());
-      flash(`「${link.name}」已${link.is_public ? "私密" : "公开"}`);
+      toast("success", `「${link.name}」已${link.is_public ? "私密" : "公开"}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "修改失败");
     }
   };
 
-  const removeLink = async (id: number) => {
-    if (!window.confirm("删除该快捷方式？")) return;
+  const confirmDeleteLink = async () => {
+    if (deleteLinkId === null) return;
+    setError("");
     try {
-      await api.deleteLink(id);
+      await api.deleteLink(deleteLinkId);
       setLinks(await api.listLinks());
+      toast("success", "快捷方式已删除");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "删除失败");
     }
+    setDeleteLinkId(null);
   };
 
   const saveUserSettings = async (patch: Record<string, string>) => {
+    setError("");
     try {
       await api.updateUserSettings(patch);
-      flash("个人设置已保存");
+      toast("success", "个人设置已保存");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "保存失败");
     }
@@ -210,308 +221,369 @@ export function SettingsPage() {
 
   return (
     <div className="relative min-h-screen bg-background">
+      <AuroraBackground soft />
       <TechAmbience />
       <div className="relative z-10">
         <AppHeader username={me?.user.username} />
         <main className="mx-auto max-w-5xl px-4 py-8">
-          <div className="mb-6 flex items-center gap-2">
-            {(["site", "manage", "personal"] as Tab[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={`btn ${tab === item ? "btn-primary" : "btn-ghost"} h-9 px-4`}
-                onClick={() => setTab(item)}
-              >
-                {item === "site" ? "站点信息" : item === "manage" ? "快捷方式" : "个人设置"}
-              </button>
-            ))}
-          </div>
-          {error ? <div className="badge badge-danger mb-4 w-full justify-center py-2">{error}</div> : null}
-          {saved ? <div className="badge badge-success mb-4 w-full justify-center py-2">{saved}</div> : null}
+          <ScrollTabs
+            tabs={[
+              { key: "site", label: "站点信息" },
+              { key: "manage", label: "快捷方式" },
+              { key: "personal", label: "个人设置" },
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
+          <div className="mt-6">
+            {error ? (
+              <div className="notice notice-danger mb-4">
+                <span>{error}</span>
+              </div>
+            ) : null}
 
-          {tab === "site" && site ? (
-            <form onSubmit={saveSite} className="card space-y-4 p-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label">站点名称</label>
-                  <input
-                    className="input"
-                    value={site.site_name}
-                    onChange={(e) => setSite({ ...site, site_name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="label">slogan</label>
-                  <input
-                    className="input"
-                    value={site.slogan}
-                    onChange={(e) => setSite({ ...site, slogan: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="label">描述</label>
-                <textarea
-                  className="input"
-                  rows={2}
-                  value={site.description}
-                  onChange={(e) => setSite({ ...site, description: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label">Logo</label>
-                  <div className="flex items-center gap-2">
-                    <img src={site.logo} alt="" className="h-10 w-10 rounded-xl bg-surface-2 object-cover" />
+            {tab === "site" && site ? (
+              <form onSubmit={saveSite} className="card space-y-4 p-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">站点名称</label>
                     <input
-                      type="file"
-                      accept="image/webp,image/png,image/jpeg,image/gif"
-                      className="text-sm text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:text-primary"
-                      onChange={(e) => void uploadImage("logo", e.target.files?.[0])}
+                      className="input"
+                      value={site.site_name}
+                      onChange={(e) => setSite({ ...site, site_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">slogan</label>
+                    <input
+                      className="input"
+                      value={site.slogan}
+                      onChange={(e) => setSite({ ...site, slogan: e.target.value })}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="label">favicon</label>
-                  <div className="flex items-center gap-2">
-                    <img src={site.favicon} alt="" className="h-10 w-10 rounded-xl bg-surface-2 object-cover" />
+                  <label className="label">描述</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={site.description}
+                    onChange={(e) => setSite({ ...site, description: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">Logo</label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <img src={site.logo} alt="" className="h-10 w-10 rounded-xl bg-surface-2 object-cover" />
+                      <input
+                        type="file"
+                        accept="image/webp,image/png,image/jpeg,image/gif"
+                        className="text-sm text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:text-primary"
+                        onChange={(e) => void uploadImage("logo", e.target.files?.[0])}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">favicon</label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <img src={site.favicon} alt="" className="h-10 w-10 rounded-xl bg-surface-2 object-cover" />
+                      <input
+                        type="file"
+                        accept="image/webp,image/png,image/jpeg,image/gif"
+                        className="text-sm text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:text-primary"
+                        onChange={(e) => void uploadImage("favicon", e.target.files?.[0])}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">页脚文案</label>
                     <input
-                      type="file"
-                      accept="image/webp,image/png,image/jpeg,image/gif"
-                      className="text-sm text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:text-primary"
-                      onChange={(e) => void uploadImage("favicon", e.target.files?.[0])}
+                      className="input"
+                      value={site.footer_text}
+                      onChange={(e) => setSite({ ...site, footer_text: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">备案号</label>
+                    <input
+                      className="input"
+                      value={site.icp}
+                      onChange={(e) => setSite({ ...site, icp: e.target.value })}
                     />
                   </div>
                 </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label">页脚文案</label>
-                  <input
-                    className="input"
-                    value={site.footer_text}
-                    onChange={(e) => setSite({ ...site, footer_text: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="label">备案号</label>
-                  <input
-                    className="input"
-                    value={site.icp}
-                    onChange={(e) => setSite({ ...site, icp: e.target.value })}
-                  />
-                </div>
-              </div>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-[var(--lipanel-primary)]"
-                  checked={site.public_mode === "true"}
-                  onChange={(e) => setSite({ ...site, public_mode: e.target.checked ? "true" : "false" })}
-                />
-                允许访客查看公开内容
-              </label>
-              <button type="submit" className="btn btn-primary">保存站点信息</button>
-            </form>
-          ) : null}
-
-          {tab === "manage" ? (
-            <div className="space-y-6">
-              <form onSubmit={addGroup} className="card flex flex-wrap items-end gap-3 p-6">
-                <div className="min-w-48 flex-1">
-                  <label className="label">新建分组</label>
-                  <input
-                    className="input"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    placeholder="分组名称"
-                    required
-                  />
-                </div>
-                <label className="flex cursor-pointer items-center gap-2 pb-2.5 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-[var(--lipanel-primary)]"
-                    checked={newGroupPublic}
-                    onChange={(e) => setNewGroupPublic(e.target.checked)}
-                  />
-                  公开
-                </label>
-                <button type="submit" className="btn btn-primary">创建</button>
-              </form>
-
-              <div className="card p-6">
-                <h2 className="mb-3 text-sm font-semibold text-foreground">分组</h2>
-                <ul className="space-y-2">
-                  {groups.map((group) => (
-                    <li key={group.id} className="flex items-center gap-2 rounded-xl bg-surface-2/60 px-3 py-2">
-                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{group.name}</span>
-                      <button
-                        type="button"
-                        className="btn btn-ghost h-8 px-3 text-xs"
-                        onClick={() => void toggleGroup(group)}
-                      >
-                        {group.is_public ? "公开" : "私密"}（点击切换）
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger h-8 px-3 text-xs"
-                        onClick={() => void removeGroup(group.id)}
-                      >
-                        删除
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <form onSubmit={saveLink} className="card grid gap-3 p-6 sm:grid-cols-2">
-                <h2 className="text-sm font-semibold text-foreground sm:col-span-2">
-                  {linkForm.id === null ? "新建快捷方式" : `编辑：${linkForm.name}`}
-                </h2>
-                <input
-                  className="input"
-                  placeholder="名称"
-                  value={linkForm.name}
-                  onChange={(e) => setLinkForm({ ...linkForm, name: e.target.value })}
-                  required
-                />
-                <input
-                  className="input"
-                  placeholder="内网地址 http://…"
-                  value={linkForm.url_lan}
-                  onChange={(e) => setLinkForm({ ...linkForm, url_lan: e.target.value })}
-                  required
-                />
-                <input
-                  className="input"
-                  placeholder="公网地址（可选）"
-                  value={linkForm.url_wan}
-                  onChange={(e) => setLinkForm({ ...linkForm, url_wan: e.target.value })}
-                />
-                <select
-                  className="input"
-                  value={linkForm.group_id}
-                  onChange={(e) => setLinkForm({ ...linkForm, group_id: e.target.value })}
-                >
-                  <option value="">未分组</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>{group.name}</option>
-                  ))}
-                </select>
-                <input
-                  className="input sm:col-span-2"
-                  placeholder="描述（可选）"
-                  value={linkForm.description}
-                  onChange={(e) => setLinkForm({ ...linkForm, description: e.target.value })}
-                />
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-[var(--lipanel-primary)]"
-                    checked={linkForm.is_public}
-                    onChange={(e) => setLinkForm({ ...linkForm, is_public: e.target.checked })}
+                    checked={site.public_mode === "true"}
+                    onChange={(e) => setSite({ ...site, public_mode: e.target.checked ? "true" : "false" })}
                   />
-                  公开
+                  允许访客查看公开内容
                 </label>
-                <select
-                  className="input"
-                  value={linkForm.guest_url_mode}
-                  onChange={(e) =>
-                    setLinkForm({
-                      ...linkForm,
-                      guest_url_mode: e.target.value as "hidden" | "show",
-                    })
-                  }
-                >
-                  <option value="hidden">访客隐藏 URL（/go 跳转）</option>
-                  <option value="show">访客直接显示 URL</option>
-                </select>
-                <button type="submit" className="btn btn-primary sm:col-span-2">
-                  {linkForm.id === null ? "创建" : "保存修改"}
-                </button>
+                <button type="submit" className="btn btn-primary">保存站点信息</button>
               </form>
+            ) : null}
 
-              <div className="card p-6">
-                <h2 className="mb-3 text-sm font-semibold text-foreground">快捷方式（{links.length}）</h2>
-                <ul className="space-y-2">
-                  {links.map((link) => (
-                    <li key={link.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-surface-2/60 px-3 py-2">
-                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                        {link.name}
-                        <span className="ml-2 text-xs text-muted">{link.url_lan}</span>
-                      </span>
-                      <button
-                        type="button"
-                        className="btn btn-ghost h-8 px-3 text-xs"
-                        onClick={() => void toggleLinkPublic(link)}
-                      >
-                        {link.is_public ? "公开" : "私密"}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost h-8 px-3 text-xs"
-                        onClick={() => editLink(link)}
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger h-8 px-3 text-xs"
-                        onClick={() => void removeLink(link.id)}
-                      >
-                        删除
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ) : null}
+            {tab === "manage" ? (
+              <div className="space-y-6">
+                <form onSubmit={addGroup} className="card flex flex-wrap items-end gap-3 p-6">
+                  <div className="min-w-48 flex-1">
+                    <label className="label">新建分组</label>
+                    <input
+                      className="input"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="分组名称"
+                      required
+                    />
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 pb-2.5 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[var(--lipanel-primary)]"
+                      checked={newGroupPublic}
+                      onChange={(e) => setNewGroupPublic(e.target.checked)}
+                    />
+                    公开
+                  </label>
+                  <button type="submit" className="btn btn-primary">创建</button>
+                </form>
 
-          {tab === "personal" ? (
-            <div className="card max-w-lg space-y-5 p-6">
-              <div>
-                <label className="label">主题</label>
-                <select
-                  className="input"
-                  value={getTheme()}
-                  onChange={(e) => {
-                    const theme = e.target.value as Theme;
-                    applyTheme(theme);
-                    void saveUserSettings({ theme });
-                  }}
-                >
-                  <option value="system">跟随系统</option>
-                  <option value="light">浅色</option>
-                  <option value="dark">深色</option>
-                </select>
+                <div className="card overflow-hidden p-6">
+                  <h2 className="mb-3 text-sm font-semibold text-foreground">分组</h2>
+                  <div className="overflow-x-auto">
+                    <table className="table-shell">
+                      <thead>
+                        <tr>
+                          <th>名称</th>
+                          <th>访客可见</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groups.map((group) => (
+                          <tr key={group.id}>
+                            <td className="font-medium">{group.name}</td>
+                            <td>
+                              <span className={`badge ${group.is_public ? "badge-primary" : "badge-muted"}`}>
+                                {group.is_public ? "公开" : "私密"}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost h-8 px-3 text-xs"
+                                  onClick={() => void toggleGroup(group)}
+                                >
+                                  切换可见性
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger h-8 px-3 text-xs"
+                                  onClick={() => setDeleteGroupId(group.id)}
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <form onSubmit={saveLink} className="card grid gap-3 p-6 sm:grid-cols-2">
+                  <h2 className="text-sm font-semibold text-foreground sm:col-span-2">
+                    {linkForm.id === null ? "新建快捷方式" : `编辑：${linkForm.name}`}
+                  </h2>
+                  <input
+                    className="input"
+                    placeholder="名称"
+                    value={linkForm.name}
+                    onChange={(e) => setLinkForm({ ...linkForm, name: e.target.value })}
+                    required
+                  />
+                  <input
+                    className="input"
+                    placeholder="内网地址 http://…"
+                    value={linkForm.url_lan}
+                    onChange={(e) => setLinkForm({ ...linkForm, url_lan: e.target.value })}
+                    required
+                  />
+                  <input
+                    className="input"
+                    placeholder="公网地址（可选）"
+                    value={linkForm.url_wan}
+                    onChange={(e) => setLinkForm({ ...linkForm, url_wan: e.target.value })}
+                  />
+                  <select
+                    className="input"
+                    value={linkForm.group_id}
+                    onChange={(e) => setLinkForm({ ...linkForm, group_id: e.target.value })}
+                  >
+                    <option value="">未分组</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>{group.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="input sm:col-span-2"
+                    placeholder="描述（可选）"
+                    value={linkForm.description}
+                    onChange={(e) => setLinkForm({ ...linkForm, description: e.target.value })}
+                  />
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[var(--lipanel-primary)]"
+                      checked={linkForm.is_public}
+                      onChange={(e) => setLinkForm({ ...linkForm, is_public: e.target.checked })}
+                    />
+                    公开
+                  </label>
+                  <select
+                    className="input"
+                    value={linkForm.guest_url_mode}
+                    onChange={(e) =>
+                      setLinkForm({
+                        ...linkForm,
+                        guest_url_mode: e.target.value as "hidden" | "show",
+                      })
+                    }
+                  >
+                    <option value="hidden">访客隐藏 URL（/go 跳转）</option>
+                    <option value="show">访客直接显示 URL</option>
+                  </select>
+                  <button type="submit" className="btn btn-primary sm:col-span-2">
+                    {linkForm.id === null ? "创建" : "保存修改"}
+                  </button>
+                </form>
+
+                <div className="card overflow-hidden p-6">
+                  <h2 className="mb-3 text-sm font-semibold text-foreground">
+                    快捷方式（{links.length}）
+                  </h2>
+                  <div className="overflow-x-auto">
+                    <table className="table-shell">
+                      <thead>
+                        <tr>
+                          <th>名称</th>
+                          <th>内网地址</th>
+                          <th>可见性</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {links.map((link) => (
+                          <tr key={link.id}>
+                            <td className="font-medium">{link.name}</td>
+                            <td className="max-w-56 truncate font-mono text-xs text-muted">
+                              {link.url_lan}
+                            </td>
+                            <td>
+                              <span className={`badge ${link.is_public ? "badge-primary" : "badge-muted"}`}>
+                                {link.is_public ? "公开" : "私密"}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost h-8 px-3 text-xs"
+                                  onClick={() => void toggleLinkPublic(link)}
+                                >
+                                  切换
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost h-8 px-3 text-xs"
+                                  onClick={() => editLink(link)}
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger h-8 px-3 text-xs"
+                                  onClick={() => setDeleteLinkId(link.id)}
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="label">链接模式</label>
-                <select
-                  className="input"
-                  defaultValue="lan"
-                  onChange={(e) => void saveUserSettings({ link_mode: e.target.value })}
-                >
-                  <option value="lan">内网优先</option>
-                  <option value="wan">公网优先</option>
-                </select>
+            ) : null}
+
+            {tab === "personal" ? (
+              <div className="card max-w-lg space-y-5 p-6">
+                <div>
+                  <label className="label">主题</label>
+                  <select
+                    className="input"
+                    value={getTheme()}
+                    onChange={(e) => {
+                      const theme = e.target.value as Theme;
+                      applyTheme(theme);
+                      void saveUserSettings({ theme });
+                    }}
+                  >
+                    <option value="system">跟随系统</option>
+                    <option value="light">浅色</option>
+                    <option value="dark">深色</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">链接模式</label>
+                  <select
+                    className="input"
+                    defaultValue="lan"
+                    onChange={(e) => void saveUserSettings({ link_mode: e.target.value })}
+                  >
+                    <option value="lan">内网优先</option>
+                    <option value="wan">公网优先</option>
+                  </select>
+                </div>
+                <div className="rounded-xl bg-surface-2/60 p-4">
+                  <p className="text-sm font-medium text-foreground">SSO 绑定</p>
+                  {me?.sso.bound ? (
+                    <p className="mt-1 text-sm text-muted">
+                      已绑定：{me.sso.provider}{" "}
+                      {me.sso.email ? `（${me.sso.email}）` : ""}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-muted">未绑定</p>
+                  )}
+                </div>
               </div>
-              <div className="rounded-xl bg-surface-2/60 p-4">
-                <p className="text-sm font-medium text-foreground">SSO 绑定</p>
-                {me?.sso.bound ? (
-                  <p className="mt-1 text-sm text-muted">
-                    已绑定：{me.sso.provider} {me.sso.email ? `（${me.sso.email}）` : ""}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-sm text-muted">未绑定</p>
-                )}
-              </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </main>
       </div>
+      <ConfirmDialog
+        open={deleteGroupId !== null}
+        title="删除分组"
+        message="删除后该分组下的快捷方式将保留为「未分组」。"
+        onConfirm={() => void confirmDeleteGroup()}
+        onCancel={() => setDeleteGroupId(null)}
+      />
+      <ConfirmDialog
+        open={deleteLinkId !== null}
+        title="删除快捷方式"
+        message="删除后不可恢复。"
+        onConfirm={() => void confirmDeleteLink()}
+        onCancel={() => setDeleteLinkId(null)}
+      />
     </div>
   );
 }

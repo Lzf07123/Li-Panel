@@ -9,7 +9,7 @@ export function LinkCard({ link }: { link: LinkItem }) {
       href={href}
       target={target}
       rel={target ? "noreferrer" : undefined}
-      className="card flex cursor-pointer items-center gap-3 p-4"
+      className="card card-signature flex cursor-pointer items-center gap-3 p-4"
     >
       {link.icon_type === "upload" && link.icon_value ? (
         <img src={link.icon_value} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover" />
@@ -25,7 +25,7 @@ export function LinkCard({ link }: { link: LinkItem }) {
         ) : null}
       </span>
       <svg className="ml-auto h-4 w-4 shrink-0 text-muted" aria-hidden="true">
-        <use href="#i-external" />
+        <use href="/icons.svg#i-external" />
       </svg>
     </a>
   );

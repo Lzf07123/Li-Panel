@@ -337,6 +337,281 @@
   .badge-primary {
     @apply bg-primary-soft text-primary;
   }
+
+  /* 提示条：语义色 + soft 底色 + 状态图标位 */
+  .notice {
+    @apply flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm;
+  }
+  .notice-success {
+    @apply border-success/30 bg-success-soft text-success;
+  }
+  .notice-warning {
+    @apply border-warning/30 bg-warning-soft text-warning;
+  }
+  .notice-danger {
+    @apply border-destructive/30 bg-destructive-soft text-destructive;
+  }
+
+  /* 卡片签名描边：低饱和渐变 border，padding-box + border-box 双背景 */
+  .card-signature {
+    position: relative;
+  }
+  .card-signature::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      var(--lipanel-accent-aqua),
+      transparent 42%,
+      var(--lipanel-accent-lilac)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* 卡片辉光 / 品牌辉光：垫底呼吸光，isolation 保证不遮挡内容 */
+  .card-halo {
+    position: relative;
+    isolation: isolate;
+  }
+  .card-halo::before {
+    content: "";
+    position: absolute;
+    inset: -48px;
+    z-index: -1;
+    border-radius: 999px;
+    background: radial-gradient(
+      closest-side,
+      var(--lipanel-primary-soft),
+      transparent 72%
+    );
+    filter: blur(28px);
+    opacity: 0.55;
+    animation: lipanel-halo-breathe 4.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .brand-halo {
+    position: relative;
+    display: inline-flex;
+  }
+  .brand-halo::after {
+    content: "";
+    position: absolute;
+    inset: -12px;
+    z-index: -1;
+    border-radius: 9999px;
+    background: radial-gradient(
+      closest-side,
+      var(--lipanel-tech-dot-glow),
+      transparent 75%
+    );
+    filter: blur(10px);
+    opacity: 0.5;
+    animation: lipanel-halo-breathe 4.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes lipanel-halo-breathe {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.98);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.02);
+    }
+  }
+
+  /* 主按钮扫光：只在 primary，disabled 关闭 */
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.22),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: lipanel-btn-sweep 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .btn-primary:disabled::after {
+    display: none;
+  }
+  @keyframes lipanel-btn-sweep {
+    0%,
+    62% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* 弹窗：遮罩 z-70，卡片入场 */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(24, 40, 37, 0.45);
+    animation: lipanel-fade-in var(--motion-fast) var(--ease-out) both;
+  }
+  .modal-card {
+    width: 100%;
+    max-width: 28rem;
+    animation: lipanel-modal-in var(--motion-base) var(--ease-out) both;
+  }
+  @keyframes lipanel-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes lipanel-modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Toast：z-80 高于弹窗，带进度条与进入动画 */
+  .toast {
+    display: flex;
+    min-width: 16rem;
+    max-width: calc(100vw - 2rem);
+    align-items: flex-start;
+    gap: 0.5rem;
+    overflow: hidden;
+    animation: lipanel-toast-in var(--motion-base) var(--ease-spring) both;
+  }
+  .toast-host {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 80;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .toast-progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 2px;
+    background: currentColor;
+    opacity: 0.6;
+    animation: lipanel-toast-progress 2.5s linear forwards;
+  }
+  @keyframes lipanel-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes lipanel-toast-progress {
+    from {
+      width: 100%;
+    }
+    to {
+      width: 0;
+    }
+  }
+
+  /* 表格外壳：管理后台使用，移动端横向滚动 */
+  .table-shell {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .table-shell thead th {
+    background: var(--lipanel-surface-2);
+    color: var(--lipanel-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-align: left;
+    padding: 0.55rem 0.75rem;
+    white-space: nowrap;
+  }
+  .table-shell thead th:first-child {
+    border-radius: 0.75rem 0 0 0;
+  }
+  .table-shell thead th:last-child {
+    border-radius: 0 0.75rem 0 0;
+  }
+  .table-shell tbody td {
+    padding: 0.55rem 0.75rem;
+    border-top: 1px solid var(--lipanel-border);
+    font-size: 0.875rem;
+    color: var(--lipanel-fg);
+    vertical-align: middle;
+  }
+  .table-shell tbody tr:hover td {
+    background: color-mix(in srgb, var(--lipanel-surface-2) 60%, transparent);
+  }
+
+  /* 横滑标签栏：隐藏滚动条、snap 吸附 */
+  .tabs-scroll {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .tabs-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .tabs-scroll > * {
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+
+  /* 骨架屏：入场扫光 */
+  .skeleton-block {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background: var(--lipanel-surface-2);
+  }
+  .skeleton-block::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.45),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
 }
 
 @layer utilities {
@@ -391,6 +666,37 @@
   @keyframes spin {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  /* 文字浮现：按词错峰模糊浮现（对应模板 BlurText） */
+  .blur-word {
+    display: inline-block;
+    opacity: 0;
+    animation: lipanel-blur-in 420ms var(--ease-out) both;
+  }
+  .blur-word:nth-child(1) { animation-delay: 0ms; }
+  .blur-word:nth-child(2) { animation-delay: 40ms; }
+  .blur-word:nth-child(3) { animation-delay: 80ms; }
+  .blur-word:nth-child(4) { animation-delay: 120ms; }
+  .blur-word:nth-child(5) { animation-delay: 160ms; }
+  .blur-word:nth-child(6) { animation-delay: 200ms; }
+  .blur-word:nth-child(7) { animation-delay: 240ms; }
+  .blur-word:nth-child(8) { animation-delay: 280ms; }
+  .blur-word:nth-child(9) { animation-delay: 320ms; }
+  .blur-word:nth-child(10) { animation-delay: 360ms; }
+  .blur-word:nth-child(11) { animation-delay: 400ms; }
+  .blur-word:nth-child(12) { animation-delay: 440ms; }
+  @keyframes lipanel-blur-in {
+    from {
+      opacity: 0;
+      filter: blur(8px);
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0);
+      transform: none;
     }
   }
 }
@@ -532,6 +838,89 @@
     display: none;
   }
   .tech-grid {
+    animation: none;
+  }
+}
+
+/* 极光背景：3–4 枚弥散光斑缓慢漂移（18–28s 档），工作台/后台用 soft */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora span {
+  position: absolute;
+  width: 42vmax;
+  height: 42vmax;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.32;
+  will-change: transform;
+}
+.aurora span:nth-child(1) {
+  top: -12%;
+  left: -12%;
+  background: var(--lipanel-accent-aqua);
+  animation: lipanel-aurora-1 22s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(2) {
+  top: 30%;
+  right: -18%;
+  background: var(--lipanel-accent-ice);
+  animation: lipanel-aurora-2 28s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(3) {
+  bottom: -18%;
+  left: 24%;
+  background: var(--lipanel-accent-lilac);
+  animation: lipanel-aurora-3 24s ease-in-out infinite alternate;
+}
+.aurora-soft span {
+  opacity: 0.18;
+}
+@keyframes lipanel-aurora-1 {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(8vmax, 6vmax) scale(1.15);
+  }
+}
+@keyframes lipanel-aurora-2 {
+  from {
+    transform: translate(0, 0) scale(1.1);
+  }
+  to {
+    transform: translate(-10vmax, -5vmax) scale(0.95);
+  }
+}
+@keyframes lipanel-aurora-3 {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(-6vmax, -8vmax) scale(1.2);
+  }
+}
+
+/* 移动端极光减量：只留 1 枚光斑并降低透明度 */
+@media (max-width: 767px) {
+  .aurora span:nth-child(2),
+  .aurora span:nth-child(3) {
+    display: none;
+  }
+  .aurora span {
+    opacity: 0.18;
+    filter: blur(50px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora span,
+  .card-halo::before,
+  .brand-halo::after {
     animation: none;
   }
 }
