@@ -49,11 +49,14 @@ export function LinkCard({
         </span>
       )}
       <span className="min-w-0">
-        <span className="block truncate text-sm font-medium text-foreground">
+        <span
+          title={link.name}
+          className="block text-sm font-medium leading-snug text-foreground line-clamp-2"
+        >
           {link.name}
         </span>
         {link.description ? (
-          <span className="block truncate text-xs text-muted">
+          <span title={link.description} className="block truncate text-xs text-muted">
             {link.description}
           </span>
         ) : null}
