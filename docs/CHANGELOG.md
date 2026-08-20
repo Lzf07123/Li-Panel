@@ -2,6 +2,13 @@
 
 ## 0.1.0（2026-08-21）
 
+### 上线前审查修复（2026-08-21）
+
+- **安全**：修复 SPA 回退路径穿越（编码 `..` 可下载 `data/panel.db` 等任意文件）；通知 webhook（`notify_url`/`notify_enabled`）仅管理员可见；登录锁定到期后自动解除；SSO 回调/RP 登出全链路使用配置的会话 Cookie 名（`PANEL_HOST_COOKIE` 生效）；登出回跳拒绝反斜杠防开放跳转。
+- **部署**：compose 补齐全部运行期环境变量透传（Host 白名单/HSTS/登录锁定/图标抓取/健康检查/备份保留/SSO 回跳等此前在容器内失效）；后端固定监听容器内 8000，`PANEL_PORT` 仅作宿主机对外端口，改端口不再导致反代断链；`NPM_REGISTRY` 经 `npm ci --registry` 真正生效（此前被 `frontend/.npmrc` 覆盖）；VITE_* 品牌构建参数接入 Docker 构建；nginx `gzip_types` 补 `text/javascript` 并开启 `gzip_static`/`gzip_vary`。
+- **脚本**：冒烟脚本导入断言改用链接总数（同名分组合并后 `groups+ungrouped` 不再增长）。
+- 验证：pytest 177 passed（新增 6 项回归）；tsc/vite build/vitest 13 passed；镜像重建后健康检查、`docker stats` 46.66MiB、gzip 压缩、冒烟 PASS。
+
 ### 50 版本迭代（V01–V50 全量完成）
 
 - **Phase A 搜索与导航（V01–V10）**：`/` 聚焦搜索、键盘导航、外部搜索回退、标签筛选、最近使用、`Ctrl/⌘+K` 命令面板、内置窗口、分组折叠记忆、空状态引导、可达性。

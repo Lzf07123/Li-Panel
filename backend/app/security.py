@@ -111,12 +111,17 @@ class LoginLockout:
 
     def is_locked(self, username: str, ip: str) -> bool:
         with self._lock:
-            entry = self._state.get(self._key(username, ip))
+            key = self._key(username, ip)
+            entry = self._state.get(key)
             if entry is None:
                 return False
             fails, locked_until = entry
-            if locked_until > 0 and time.monotonic() < locked_until:
-                return True
+            if locked_until > 0:
+                if time.monotonic() < locked_until:
+                    return True
+                # 锁定期结束：清空计数，允许再次尝试
+                self._state.pop(key, None)
+                return False
             return fails >= self.max_fails
 
     def record_failure(self, username: str, ip: str) -> None:

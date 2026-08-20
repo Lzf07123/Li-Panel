@@ -69,6 +69,10 @@ def panel(
 
     site_payload = dict(site)
     site_payload["oidc_enabled"] = settings.oidc_enabled
+    # 通知 webhook 为敏感配置：非管理员不下发
+    if user is None or user["role"] != "admin":
+        site_payload.pop("notify_url", None)
+        site_payload.pop("notify_enabled", None)
 
     if user is not None:
         mode_row = conn.execute(

@@ -37,6 +37,12 @@
 
 ## 修复记录
 
+2026-08-21 上线前审查修复：
+
+- SPA 回退路径穿越（编码 `..` 下载任意文件）与通知 webhook 公开泄漏已修复；登录锁定窗口到期自动解除；SSO 回调/登出改用配置的会话 Cookie 名，`PANEL_HOST_COOKIE` 全链路生效；登出回跳拒绝反斜杠。
+- compose 补齐全部运行期环境变量透传（此前 Host 白名单/HSTS/登录锁定参数等在容器内失效）；后端固定监听容器内 8000，`PANEL_PORT` 仅宿主机对外端口；`npm ci --registry` 修复 `NPM_REGISTRY` 被 `frontend/.npmrc` 覆盖；VITE_* 品牌参数接入 Docker 构建；nginx 补 `text/javascript` gzip 类型并开 `gzip_static`/`gzip_vary`。
+- 验证：pytest 177 passed、vitest 13 passed、容器实测 46.66MiB、冒烟 PASS。
+
 2026-08-21 健康结果显示与 favicon 自动获取：
 
 - 卡片健康结果统一右侧对齐并显示延迟毫秒（`min-w-14` + `text-right` + `tabular-nums`，在线显示 `Nms`、离线/未知显示状态文案，点击状态点仍可看趋势）

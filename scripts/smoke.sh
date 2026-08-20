@@ -54,10 +54,11 @@ curl -fsS -b "$COOKIE_JAR" "$BASE/api/backup" > /tmp/lipanel-smoke-backup.json
 [ "$(JSON "len(d['links'])" < /tmp/lipanel-smoke-backup.json)" -ge 1 ]
 
 echo "==> import backup (append)"
-BEFORE="$(curl -fsS -b "$COOKIE_JAR" "$BASE/api/panel" | JSON "len(d['groups'])+len(d['ungrouped'])")"
+# 同名分组会合并复用（V19 设计），因此以「链接总数」断言追加成功
+BEFORE="$(curl -fsS -b "$COOKIE_JAR" "$BASE/api/links" | JSON "len(d)")"
 curl -fsS -b "$COOKIE_JAR" -X POST "$BASE/api/backup" \
   -H 'Content-Type: application/json' --data-binary @/tmp/lipanel-smoke-backup.json >/dev/null
-AFTER="$(curl -fsS -b "$COOKIE_JAR" "$BASE/api/panel" | JSON "len(d['groups'])+len(d['ungrouped'])")"
+AFTER="$(curl -fsS -b "$COOKIE_JAR" "$BASE/api/links" | JSON "len(d)")"
 [ "$AFTER" -gt "$BEFORE" ] || { echo "FAIL: 导入未追加"; exit 1; }
 
 echo "==> guest visibility (public only)"

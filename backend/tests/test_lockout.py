@@ -75,3 +75,22 @@ def test_lockout_configurable(client, tmp_path):
         ).status_code
         == 429
     )
+
+
+def test_lockout_expires_after_window(monkeypatch):
+    """上线前修复：锁定窗口结束后必须自动解除，不能永久锁死。"""
+    import app.security as sec
+
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(sec.time, "monotonic", lambda: clock["now"])
+    lk = sec.LoginLockout(max_fails=2, lock_minutes=1)
+    lk.record_failure("admin", "1.2.3.4")
+    lk.record_failure("admin", "1.2.3.4")
+    assert lk.is_locked("admin", "1.2.3.4")
+    clock["now"] += 61
+    assert not lk.is_locked("admin", "1.2.3.4")
+    # 解锁后重新计数，仍能再次锁定
+    lk.record_failure("admin", "1.2.3.4")
+    assert not lk.is_locked("admin", "1.2.3.4")
+    lk.record_failure("admin", "1.2.3.4")
+    assert lk.is_locked("admin", "1.2.3.4")

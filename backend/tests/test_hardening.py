@@ -75,3 +75,25 @@ def test_host_cookie_prefix(client, tmp_path):
     # 旧名不再可用
     old = {"Cookie": f"lipanel_session={r.cookies['__Host-lipanel_session']}"}
     assert c.get("/api/auth/me", headers=old).status_code == 401
+
+
+def test_spa_fallback_traversal_blocked(client):
+    """上线前修复：SPA 回退必须拒绝 .. 段，防止读取容器内任意文件（含 data/panel.db）。"""
+    for path in [
+        "/%2e%2e/%2e%2e/data/panel.db",
+        "/..%2F..%2Fdata%2Fpanel.db",
+        "/..%2F..%2Fbackend%2Fapp%2Fconfig.py",
+        "/..%2f..%2fetc%2fpasswd",
+        "/assets/..%2Fapp%2Fconfig.py",
+    ]:
+        r = client.get(path)
+        assert r.status_code == 404, f"{path} 应返回 404，实际 {r.status_code}"
+
+
+def test_spa_fallback_normal_paths_still_work(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    r = client.get("/login")
+    assert r.status_code == 200
+    r = client.get("/manifest.json")
+    assert r.status_code == 200
