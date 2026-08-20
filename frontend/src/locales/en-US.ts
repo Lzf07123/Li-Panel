@@ -117,6 +117,7 @@ export const enUS: Record<string, string> = {
   "站点名称": "Site name",
   "slogan": "Slogan",
   "描述": "Description",
+  "版权行": "Copyright line",
   "备案号": "ICP filing",
   "备案链接": "ICP filing URL",
   "备案图标": "ICP icon",

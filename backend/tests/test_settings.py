@@ -125,3 +125,15 @@ def test_footer_text_default_empty_and_legacy_cleanup(tmp_path):
     seed_site_defaults(conn, True)
     assert get_site_settings(conn)["footer_text"] == ""
     conn.close()
+
+
+def test_copyright_setting_roundtrip(client, auth_headers):
+    """版权行后台可配：保存后公开读取与面板接口均返回。"""
+    r = client.put(
+        "/api/site-settings", json={"copyright": "© 2026 我的面板"}, headers=auth_headers
+    )
+    assert r.status_code == 200
+    assert r.json()["copyright"] == "© 2026 我的面板"
+    assert client.get("/api/site-settings").json()["copyright"] == "© 2026 我的面板"
+    panel = client.get("/api/panel").json()
+    assert panel["site"]["copyright"] == "© 2026 我的面板"

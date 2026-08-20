@@ -9,6 +9,7 @@ SITE_DEFAULTS: dict[str, str] = {
     "logo": "/brand-logo.webp",
     "favicon": "/favicon.webp",
     "footer_text": "",
+    "copyright": "",  # 页脚版权行：留空时前端自动生成「© 年份 站点名 · v版本」
     # 旧版本曾把 "© 2026" 写入 footer_text，与前端固定版权行「© 年 品牌 · v版本」重复；
     # 现在默认留空，页脚版权只渲染一次，footer_text 仅承载自定义补充文案。
     "icp": "",

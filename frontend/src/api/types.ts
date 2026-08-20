@@ -20,6 +20,7 @@ export interface SiteSettings {
   logo: string;
   favicon: string;
   footer_text: string;
+  copyright: string;
   icp: string;
   icp_url: string;
   icp_icon: string;

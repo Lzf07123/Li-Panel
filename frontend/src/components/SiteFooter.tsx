@@ -150,11 +150,16 @@ export function SiteFooter({
   site?: SiteSettings | null;
 }) {
   const year = new Date().getFullYear();
+  // 版权行：后台 site_settings.copyright 可覆盖；留空时自动生成（持有人跟随站点名称）
+  const copyright =
+    site?.copyright && site.copyright.trim() !== ""
+      ? site.copyright
+      : `© ${year} ${site?.site_name ?? COPYRIGHT_HOLDER} · v${APP_VERSION}`;
 
   return (
     <footer className="relative mt-auto border-t border-border/60 bg-surface/60 backdrop-blur">
       <div className="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-5 text-xs text-muted lg:px-8">
-        <span>© {year} {COPYRIGHT_HOLDER} · v{APP_VERSION}</span>
+        <span>{copyright}</span>
         {site?.footer_text ? (
           <span className="whitespace-nowrap">{site.footer_text}</span>
         ) : null}

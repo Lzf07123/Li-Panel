@@ -18,6 +18,7 @@ import { GROUP_ICON_NAMES, isGroupIconName } from "../components/GroupIcon";
 import type { GroupIconName } from "../components/GroupIcon";
 import { formatTags, parseTags } from "../lib/tags";
 import {
+  APP_VERSION,
   ICP_FILING_ICON_ENV,
   ICP_FILING_TEXT_ENV,
   ICP_FILING_URL_ENV,
@@ -576,6 +577,7 @@ export function SettingsPage() {
                     logo: site.logo,
                     favicon: site.favicon,
                     footer_text: site.footer_text,
+                    copyright: site.copyright,
                     icp: site.icp,
                     icp_url: site.icp_url,
                     icp_icon: site.icp_icon,
@@ -678,6 +680,17 @@ export function SettingsPage() {
                       onChange={(e) =>
                         setSite({ ...site, footer_text: e.target.value })
                       }
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">{t("版权行")}</span>
+                    <input
+                      className="input"
+                      value={site.copyright}
+                      onChange={(e) =>
+                        setSite({ ...site, copyright: e.target.value })
+                      }
+                      placeholder={`© ${new Date().getFullYear()} ${site.site_name} · v${APP_VERSION}`}
                     />
                   </label>
                   <label className="block">

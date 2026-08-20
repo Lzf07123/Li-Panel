@@ -28,6 +28,7 @@ SITE_KEYS = {
     "logo",
     "favicon",
     "footer_text",
+    "copyright",
     "icp",
     "icp_url",
     "icp_icon",
@@ -51,6 +52,7 @@ class SiteSettingsIn(BaseModel):
     logo: str | None = Field(default=None, max_length=500)
     favicon: str | None = Field(default=None, max_length=500)
     footer_text: str | None = Field(default=None, max_length=200)
+    copyright: str | None = Field(default=None, max_length=200)
     icp: str | None = Field(default=None, max_length=100)
     icp_url: str | None = Field(default=None, max_length=500)
     icp_icon: str | None = Field(default=None, max_length=500)
