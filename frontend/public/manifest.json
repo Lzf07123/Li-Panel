@@ -1,0 +1,31 @@
+{
+  "name": "Li&Panel 快捷方式面板",
+  "short_name": "Li&Panel",
+  "description": "个人网页快捷方式面板：一次收藏，触达所有常用入口。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6fbf9",
+  "theme_color": "#f6fbf9",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/brand-logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand-logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any"
+    }
+  ]
+}

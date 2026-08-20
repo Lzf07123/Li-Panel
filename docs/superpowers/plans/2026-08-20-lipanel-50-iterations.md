@@ -169,6 +169,7 @@
 - ✅ V38（审计日志）：2026-08-21 完成。`audit_logs` 表（登录/登出/SSO 登录/绑定/解绑/备份导入恢复/站点设置变更），滚动保留 1000 条；`GET /api/audit-logs` 仅 admin。pytest 142 passed。
 - ✅ V39（安全响应头补全）：2026-08-21 完成。CSP `font-src 'self' data:`；`COOP: same-origin`、`CORP: same-origin`、`Permissions-Policy`、HSTS（`PANEL_HSTS`，默认关）。pytest 144 passed。
 - ✅ V40（密钥与上传加固）：2026-08-21 完成。Cookie 前缀 `__Host-`（`PANEL_HOST_COOKIE`，全链路 cookie 名变量化）；上传魔数校验（png/jpg/gif/webp）；生产环境 secret ≥32 启动校验。pytest 148 passed。
-- ✅ Phase D（V31–V40）全部完成：2026-08-21，提交范围 `c6a38ef`（V31）→ 本次提交。
-- ⬜ Phase E（V41–V50）：待执行。
+- ✅ Phase D（V31–V40）全部完成：2026-08-21，提交范围 `c6a38ef`（V31）→ `9278c54`（V40）。
+- ✅ V41（PWA 清单与图标）：2026-08-21 完成。`public/manifest.json`（name/start_url/standalone/主题色/512 maskable+any）、`application-name`、apple-touch-icon；构建产物含 manifest。
+- ⬜ V42–V50：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。
