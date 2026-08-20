@@ -37,6 +37,13 @@
 
 ## 验收状态
 
+2026-08-20 Phase A（V01–V10）实测：
+
+- 前端：`npx tsc --noEmit && npx vite build` 通过；V01–V10 每版独立提交于 `codex/50-iterations`，路线图见 `docs/superpowers/plans/2026-08-20-lipanel-50-iterations.md`
+- 后端：pytest 35 passed（V07 增加 `frame-src 'self' https: http:` 后回归通过）
+- 新增能力：`/` 聚焦搜索与 `Esc` 清空；`↑/↓/Home/End/Enter` 键盘导航；无结果外部搜索回退；标签编辑与筛选；最近使用（`lipanel-recent`）；`Ctrl/⌘+K` 命令面板；内置窗口打开（iframe 沙箱 + 新标签兜底，CSP 已记录到设计文档 §9）；分组折叠记忆（`lipanel-collapsed-groups`）；空状态引导；跳过导航链接与 `main#content` 可达性
+- 顺带修复：切换可见性时不再重置 url_wan/description/tags/group_id/open_mode（V07）；搜索结果计数按筛选后计算（V03）
+
 2026-08-20 V1.4 对齐实测：
 
 - 前端：`npx tsc --noEmit && npx vite build` 通过，产物 CSS 含 `--lipanel-*` 令牌与 V1.4 控件类，无 `--portal-*` 残留

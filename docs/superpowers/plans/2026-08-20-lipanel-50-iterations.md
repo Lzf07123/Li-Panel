@@ -136,5 +136,5 @@
 
 ## 5. 状态
 
-- ✅ V01–V10（Phase A）：2026-08-20 完成，验收输出见 `design-system/lipanel/MASTER.md`。
+- ✅ V01–V10（Phase A）：2026-08-20 完成。提交范围 `c7a2766`（路线图）→ `c3253c7`（V10），每版独立提交；验收输出见 `design-system/lipanel/MASTER.md`。
 - ⬜ V11–V50：待执行；每版独立提交，可直接从 V11 继续。
