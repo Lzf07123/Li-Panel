@@ -661,6 +661,11 @@
   .toast-loading .toast-icon {
     @apply bg-primary-soft text-primary;
   }
+  /* 备案图标占位：正式图标缺失/加载失败时显示的字形方块 */
+  .filing-icon-placeholder {
+    @apply inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] bg-surface-2 text-[9px] font-semibold leading-none text-muted;
+  }
+
   .toast-enter {
     animation: toast-in 320ms var(--ease-spring) both;
     animation-delay: calc(var(--toast-index, 0) * 40ms);

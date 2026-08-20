@@ -64,6 +64,12 @@
 - 编排改为 nginx 反代：`nginx/nginx.conf` 监听 80 反代 `lipanel:8000`，compose 仅 `lipanel-nginx` 发布 `PANEL_PORT:80`，后端真实端口不再映射到宿主机；代理头/上传上限 10m/gzip；README 增补反代说明
 - 验证：`docker compose up` 后 `curl localhost:8000/api/health` 返回 ok；`docker ps` 仅 nginx 发布端口；SPA 经反代 200
 
+2026-08-21 页脚备案信息完善：
+
+- ICP / 公安备案条目独立组件（`FilingLink`）：配置了 `VITE_ICP_FILING_TEXT` / `VITE_POLICE_FILING_TEXT` 才显示，链接指向工信部/网安备案官网，条目间用 `·` 分隔
+- 备案图标预留占位：图标路径缺失或加载失败时显示「备 / 公」字形方块（`.filing-icon-placeholder`），不再出现破图
+- `.env.example` 补充前端备案变量（VITE_ICP_*/VITE_POLICE_*）；Playwright 验证：缺失图标→占位「备」、真实图标正常渲染、链接/标题正确
+
 2026-08-21 面板重复分组与健康检测触发修复：
 
 - 备份导入/恢复按分组名（大小写不敏感）合并复用，不再创建同名重复分组；链接仍按追加语义进入对应分组（`backend/app/routers/backup.py`）

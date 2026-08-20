@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -17,32 +18,83 @@ import {
   POLICE_FILING_URL,
 } from "../lib/brand";
 
-const filingLinks = (
-  <>
-    {ICP_FILING_TEXT && (
-      <a
-        href={ICP_FILING_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 whitespace-nowrap transition-colors duration-200 hover:text-foreground"
-      >
-        <img src={ICP_FILING_ICON} alt="" className="h-3.5 w-auto" />
-        {ICP_FILING_TEXT}
-      </a>
-    )}
-    {POLICE_FILING_TEXT && (
-      <a
-        href={POLICE_FILING_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 whitespace-nowrap transition-colors duration-200 hover:text-foreground"
-      >
-        <img src={POLICE_FILING_ICON} alt="" className="h-3.5 w-auto" />
-        {POLICE_FILING_TEXT}
-      </a>
-    )}
-  </>
-);
+function FilingLink({
+  text,
+  href,
+  icon,
+  placeholder,
+}: {
+  text: string;
+  href: string;
+  icon: string;
+  placeholder: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={text}
+      className="inline-flex items-center gap-1 whitespace-nowrap transition-colors duration-200 hover:text-foreground"
+    >
+      {broken || !icon ? (
+        // 预留图标占位：正式备案图标缺失/加载失败时展示字形方块
+        <span className="filing-icon-placeholder" aria-hidden="true">
+          {placeholder}
+        </span>
+      ) : (
+        <img
+          src={icon}
+          alt=""
+          loading="lazy"
+          className="h-3.5 w-3.5 object-contain"
+          onError={() => setBroken(true)}
+        />
+      )}
+      {text}
+    </a>
+  );
+}
+
+function FilingLinks() {
+  const entries = [
+    ICP_FILING_TEXT
+      ? {
+          key: "icp",
+          text: ICP_FILING_TEXT,
+          href: ICP_FILING_URL,
+          icon: ICP_FILING_ICON,
+          placeholder: "备",
+        }
+      : null,
+    POLICE_FILING_TEXT
+      ? {
+          key: "police",
+          text: POLICE_FILING_TEXT,
+          href: POLICE_FILING_URL,
+          icon: POLICE_FILING_ICON,
+          placeholder: "公",
+        }
+      : null,
+  ].filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (entries.length === 0) return null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      {entries.map((entry, index) => (
+        <span key={entry.key} className="inline-flex items-center gap-2">
+          {index > 0 ? (
+            <span aria-hidden="true" className="text-border">
+              ·
+            </span>
+          ) : null}
+          <FilingLink {...entry} />
+        </span>
+      ))}
+    </span>
+  );
+}
 
 function GitHubIcon() {
   return (
@@ -83,7 +135,7 @@ export function SiteFooter() {
     <footer className="relative mt-auto border-t border-border/60 bg-surface/60 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-5 text-xs text-muted lg:px-8">
         <span>© {year} {COPYRIGHT_HOLDER} · v{APP_VERSION}</span>
-        {filingLinks}
+        <FilingLinks />
         {FOOTER_LINKS.map((link) => (
           <FooterLink key={link.label} label={link.label} href={link.href} />
         ))}
