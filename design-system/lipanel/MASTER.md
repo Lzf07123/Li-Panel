@@ -79,7 +79,7 @@
 2026-08-21 备案信息接入后台配置（运行时同步）：
 
 - `site_settings` 新增 `icp_url/icp_icon/police_text/police_url/police_icon`（默认值见 `brand_defaults.py`）；设置页「站点信息」新增备案链接/图标、公安备案号/链接/图标字段
-- 页脚改为运行时读取 `/api/panel` 下发的 `site` 配置（`SiteFooter site` 属性），未提供时回退 `brand.ts` 默认值；`footer_text` 同步展示
+- 页脚改为运行时读取 `/api/panel` 下发的 `site` 配置（`SiteFooter site` 属性），未提供时回退 `brand.ts` 默认值；`footer_text` 同步展示；页脚尺寸与 Li&Design V1.5 一致（内容行单行高 56px，`min-h-14` 兜底）
 - 验证：pytest 171 passed；Playwright 端到端——后台写入备案 → 页脚立即显示；设置页修改公安备案号 → 保存后面板页脚同步新值
 
 2026-08-21 个人设置组件比例统一：
