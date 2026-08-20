@@ -61,8 +61,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     seed_site_defaults(conn, settings.public_mode)
     conn.close()
 
+    def _host_allowed(host: str) -> bool:
+        if not settings.allowed_hosts:
+            return True
+        hostname = host.split(":")[0]
+        for allowed in settings.allowed_hosts:
+            if allowed == hostname:
+                return True
+            if allowed.startswith("*.") and hostname.endswith(allowed[1:]):
+                return True
+        return False
+
     @app.middleware("http")
     async def security(request: Request, call_next):
+        if not _host_allowed(request.headers.get("host", "")):
+            return JSONResponse({"error": "Host 不在白名单"}, status_code=403)
         if request.method in {"POST", "PUT", "DELETE", "PATCH"}:
             origin = request.headers.get("origin")
             if origin:

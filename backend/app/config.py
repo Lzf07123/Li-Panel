@@ -39,6 +39,7 @@ class Settings:
     backup_keep: int
     health_check: bool
     sso_logout_redirects: tuple[str, ...]
+    allowed_hosts: tuple[str, ...]
 
     @property
     def db_path(self) -> Path:
@@ -94,6 +95,15 @@ def load_settings(overrides: dict | None = None) -> Settings:
             else tuple(
                 part.strip()
                 for part in os.getenv("PANEL_SSO_LOGOUT_REDIRECTS", "").split(",")
+                if part.strip()
+            )
+        ),
+        allowed_hosts=(
+            tuple(str(x) for x in o["allowed_hosts"])
+            if "allowed_hosts" in o
+            else tuple(
+                part.strip()
+                for part in os.getenv("PANEL_ALLOWED_HOSTS", "").split(",")
                 if part.strip()
             )
         ),
