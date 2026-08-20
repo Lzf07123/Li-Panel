@@ -121,9 +121,12 @@ CREATE INDEX IF NOT EXISTS idx_link_health_link ON link_health(link_id, checked_
 def connect(path: Path) -> sqlite3.Connection:
     # FastAPI 同步依赖可能在不同线程池线程中执行，同一请求的连接串行使用，
     # 因此关闭 SQLite 的跨线程检查（每个请求拥有独立连接，无并发共享）。
-    conn = sqlite3.connect(path, check_same_thread=False)
+    # isolation_level=None → 自动提交：每个语句独立事务，锁窗口极小，
+    # 配合 WAL + busy_timeout 可避免多线程/多请求下的 "database is locked"。
+    conn = sqlite3.connect(path, check_same_thread=False, timeout=10, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=10000")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
@@ -139,10 +142,8 @@ _DATA_MUTATION_PREFIXES = (
 )
 
 
-def _maybe_write_snapshot(request: Request, conn: sqlite3.Connection) -> None:
-    """数据变更提交后写自动快照（V19）；仅当连接实际有变更且路径属于数据接口。"""
-    if conn.total_changes == 0:
-        return
+def _maybe_write_snapshot(request: Request) -> None:
+    """数据变更提交并关闭请求连接后写自动快照（V19）。"""
     if not request.url.path.startswith(_DATA_MUTATION_PREFIXES):
         return
     from app.snapshot import write_snapshot
@@ -152,18 +153,27 @@ def _maybe_write_snapshot(request: Request, conn: sqlite3.Connection) -> None:
 
 
 def get_db(request: Request) -> Iterator[sqlite3.Connection]:
-    """FastAPI 依赖：请求级 SQLite 连接，结束自动 commit/close。"""
+    """FastAPI 依赖：请求级 SQLite 连接，结束自动 commit/close。
+
+    提交成功后先关闭请求连接再写快照（避免两个连接重叠）；
+    异常路径 rollback 释放锁，防止连接泄漏。
+    """
     db_path: Path = request.app.state.db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
     before = conn.total_changes
+    changed = False
     try:
         yield conn
         conn.commit()
-        if conn.total_changes > before:
-            _maybe_write_snapshot(request, conn)
+        changed = conn.total_changes > before
+    except BaseException:
+        conn.rollback()
+        raise
     finally:
         conn.close()
+    if changed:
+        _maybe_write_snapshot(request)
 
 
 def count_users(conn: sqlite3.Connection) -> int:

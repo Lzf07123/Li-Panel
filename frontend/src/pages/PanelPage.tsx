@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { authApi, healthApi, linksApi, panelApi } from "../api/client";
+import { authApi, healthApi, linksApi, panelApi, rssApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
@@ -43,6 +43,18 @@ export function PanelPage() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [previewLink, setPreviewLink] = useState<LinkOut | null>(null);
   const [trendLink, setTrendLink] = useState<LinkOut | null>(null);
+  const [rssData, setRssData] = useState<{
+    feeds: {
+      feed_url: string;
+      items: {
+        title: string;
+        link: string;
+        pub_date?: string;
+        description?: string;
+      }[];
+    }[];
+  } | null>(null);
+  const [rssOpen, setRssOpen] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(
     loadCollapsedGroups,
   );
@@ -59,6 +71,10 @@ export function PanelPage() {
       .meSilent()
       .then((current) => {
         setMe(current);
+        void rssApi
+          .feeds()
+          .then(setRssData)
+          .catch(() => setRssData(null));
         void healthApi
           .links()
           .then((data) => {
@@ -642,6 +658,57 @@ export function PanelPage() {
                   />
                 ))}
               </div>
+            </section>
+          ) : null}
+          {me && rssData && rssData.feeds.length > 0 ? (
+            <section className="mb-8">
+              <button
+                type="button"
+                aria-expanded={rssOpen}
+                className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted transition-colors hover:text-foreground"
+                onClick={() => setRssOpen((current) => !current)}
+              >
+                <span className="h-px w-4 bg-border" />
+                订阅
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    rssOpen ? "" : "-rotate-90"
+                  }`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {rssOpen ? (
+                <div className="card space-y-3 p-4">
+                  {rssData.feeds.map((feed) =>
+                    feed.items.map((item) => (
+                      <a
+                        key={`${feed.feed_url}-${item.link}`}
+                        href={item.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block min-w-0 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
+                      >
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {item.title}
+                        </span>
+                        {item.description ? (
+                          <span className="block truncate text-xs text-muted">
+                            {item.description}
+                          </span>
+                        ) : null}
+                      </a>
+                    )),
+                  )}
+                </div>
+              ) : null}
             </section>
           ) : null}
         </main>

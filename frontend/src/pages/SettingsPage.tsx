@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { authApi, backupApi, groupsApi, linksApi, settingsApi, tagsApi } from "../api/client";
+import { authApi, backupApi, groupsApi, linksApi, rssApi, settingsApi, tagsApi } from "../api/client";
 import type { GroupOut, LinkOut, MeOut, SiteSettings } from "../api/types";
 import { AppHeader } from "../components/AppHeader";
 import { AsyncButton } from "../components/AsyncButton";
@@ -73,6 +73,7 @@ export function SettingsPage() {
     }[]
   >([]);
   const [restoreName, setRestoreName] = useState<string | null>(null);
+  const [rssUrls, setRssUrls] = useState<string[]>(["", "", ""]);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
 
@@ -108,6 +109,15 @@ export function SettingsPage() {
         .user()
         .then((settings) => {
           if (settings.link_mode) setLinkMode(settings.link_mode);
+          try {
+            const feeds = JSON.parse(settings.rss_feeds ?? "[]") as unknown;
+            if (Array.isArray(feeds)) {
+              const urls = feeds.filter((u): u is string => typeof u === "string");
+              setRssUrls([...urls, "", "", ""].slice(0, 3));
+            }
+          } catch {
+            /* 忽略非法值 */
+          }
         })
         .catch(() => undefined);
       backupApi
@@ -188,6 +198,14 @@ export function SettingsPage() {
     },
     { onError: (err) => setError(err.message) },
   );
+
+  const saveRssAction = useAsyncAction(async () => {
+    const urls = rssUrls
+      .map((url) => url.trim())
+      .filter((url) => url !== "");
+    await rssApi.setFeeds(urls);
+    toast.success(urls.length > 0 ? "订阅已保存" : "订阅已清空");
+  }, { onError: (err) => setError(err.message) });
 
   const restoreSnapshotAction = useAsyncAction(async () => {
     if (restoreName === null) return;
@@ -1171,6 +1189,37 @@ export function SettingsPage() {
                   ) : (
                     <p className="mt-1 text-sm text-muted">未绑定</p>
                   )}
+                </div>
+                <div className="rounded-xl border border-border p-4">
+                  <p className="text-sm font-medium text-foreground">RSS 订阅</p>
+                  <p className="mt-1 text-xs text-muted">
+                    最多 3 个订阅源，面板展示最近条目（服务端解析缓存，超时 8s）。
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {rssUrls.map((url, index) => (
+                      <input
+                        key={index}
+                        className="input input-sm"
+                        placeholder={`订阅源 ${index + 1}（可选）`}
+                        value={url}
+                        onChange={(e) =>
+                          setRssUrls((current) =>
+                            current.map((value, i) =>
+                              i === index ? e.target.value : value,
+                            ),
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                  <AsyncButton
+                    type="button"
+                    status={saveRssAction.status}
+                    className="btn btn-ghost mt-3 h-8 px-3 text-xs"
+                    onClick={() => void saveRssAction.run()}
+                  >
+                    保存订阅
+                  </AsyncButton>
                 </div>
                 <div className="rounded-xl border border-border p-4">
                   <p className="text-sm font-medium text-foreground">数据备份</p>

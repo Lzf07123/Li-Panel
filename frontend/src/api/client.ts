@@ -197,6 +197,26 @@ export const tagsApi = {
     }),
 };
 
+export const rssApi = {
+  feeds: () =>
+    api<{
+      feeds: {
+        feed_url: string;
+        items: {
+          title: string;
+          link: string;
+          pub_date?: string;
+          description?: string;
+        }[];
+      }[];
+    }>("/api/rss"),
+  setFeeds: (urls: string[]) =>
+    api<Record<string, string>>("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ rss_feeds: urls }),
+    }),
+};
+
 export const backupApi = {
   export: () => api<Record<string, unknown>>("/api/backup"),
   import: (data: unknown) =>

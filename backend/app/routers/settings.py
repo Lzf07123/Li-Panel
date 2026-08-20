@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from pathlib import Path
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.brand_defaults import get_site_settings
 from app.db import get_db
 from app.deps import current_user
+from app.rss import MAX_FEEDS, allowed_url
 
 router = APIRouter(tags=["settings"])
 
@@ -73,6 +75,7 @@ def site_settings_put(
 class UserSettingsIn(BaseModel):
     theme: str | None = None
     link_mode: str | None = None
+    rss_feeds: list[str] | None = None
 
 
 @router.get("/api/settings")
@@ -98,6 +101,17 @@ def user_settings_put(
             raise HTTPException(status_code=422, detail="theme 取值非法")
         if key == "link_mode" and value not in LINK_MODE_VALUES:
             raise HTTPException(status_code=422, detail="link_mode 取值非法")
+        if key == "rss_feeds":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=422, detail="rss_feeds 必须是数组")
+            if len(value) > MAX_FEEDS:
+                raise HTTPException(status_code=422, detail=f"最多 {MAX_FEEDS} 个订阅源")
+            for feed in value:
+                if not isinstance(feed, str) or not allowed_url(feed):
+                    raise HTTPException(
+                        status_code=400, detail=f"订阅源地址不合法：{feed!r}"
+                    )
+            value = json.dumps(value, ensure_ascii=False)
         conn.execute(
             "INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?) "
             "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
