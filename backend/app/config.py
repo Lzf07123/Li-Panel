@@ -37,6 +37,7 @@ class Settings:
     oidc_redirect_uri: str | None
     link_icon_fetch: bool
     backup_keep: int
+    health_check: bool
 
     @property
     def db_path(self) -> Path:
@@ -85,4 +86,5 @@ def load_settings(overrides: dict | None = None) -> Settings:
         backup_keep=int(o["backup_keep"])
         if "backup_keep" in o
         else _env_int("PANEL_BACKUP_KEEP", 10),
+        health_check=flag("health_check", "PANEL_HEALTH_CHECK", True),
     )
