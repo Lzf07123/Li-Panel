@@ -1,4 +1,14 @@
 services:
+  # 一次性初始化：确保 ./data 属主为容器用户 10001（appuser），
+  # Linux 部署时若目录由 root 创建，lipanel 无写权限会报 unable to open database file。
+  data-init:
+    image: ${IMAGE_REGISTRY:-docker.io/library}/alpine:3.20
+    container_name: lipanel-data-init
+    restart: "no"
+    volumes:
+      - ./data:/data
+    command: ["sh", "-c", "mkdir -p /data && chown -R 10001:10001 /data"]
+
   lipanel:
     build:
       context: .
@@ -17,6 +27,9 @@ services:
         VITE_POLICE_FILING_ICON: ${VITE_POLICE_FILING_ICON:-}
     image: lipanel:local
     container_name: lipanel
+    depends_on:
+      data-init:
+        condition: service_completed_successfully
     # 后端固定监听容器内 8000，不直接暴露主机；对外统一由 nginx 反代（隐藏真实端口）
     environment:
       PANEL_DATA_DIR: /app/data

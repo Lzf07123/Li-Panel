@@ -64,7 +64,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.sso_limiter = RateLimiter(limit=10, window_seconds=60)
 
     settings.data_dir.mkdir(parents=True, exist_ok=True)
-    conn = connect(settings.db_path)
+    try:
+        conn = connect(settings.db_path)
+    except sqlite3.OperationalError as exc:
+        raise RuntimeError(
+            "无法打开数据库文件，数据目录不可写或权限不足。"
+            f"（{settings.db_path}）请先执行：bash scripts/fix-data-owner.sh "
+            "或 sudo chown -R 10001:10001 ./data"
+        ) from exc
     init_schema(conn)
     seed_site_defaults(conn, settings.public_mode)
     conn.close()

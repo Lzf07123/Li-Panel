@@ -97,3 +97,28 @@ def test_spa_fallback_normal_paths_still_work(client):
     assert r.status_code == 200
     r = client.get("/manifest.json")
     assert r.status_code == 200
+
+
+def test_startup_unwritable_data_dir_gives_actionable_error(tmp_path):
+    """上线前修复：数据目录不可写时给出可操作报错（提示 fix-data-owner.sh）。"""
+    import os
+
+    import pytest
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        pytest.skip("root 不受文件权限限制，跳过")
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    os.chmod(data_dir, 0o500)
+    try:
+        with pytest.raises(RuntimeError, match="fix-data-owner|chown"):
+            create_app(
+                load_settings(
+                    overrides={"data_dir": str(data_dir), "secret_key": "x"}
+                )
+            )
+    finally:
+        os.chmod(data_dir, 0o700)
