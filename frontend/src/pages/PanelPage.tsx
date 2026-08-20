@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { authApi, panelApi } from "../api/client";
+import { authApi, linksApi, panelApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
@@ -17,6 +17,7 @@ import { AuroraBackground } from "../components/bits/AuroraBackground";
 import { BlurText } from "../components/bits/BlurText";
 import { FloatingBackground } from "../components/FloatingBackground";
 import { TechAmbience } from "../components/bits/TechAmbience";
+import { useToast } from "../hooks/useToast";
 
 function matches(link: LinkOut, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -41,6 +42,9 @@ export function PanelPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(
     loadCollapsedGroups,
   );
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const toast = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -178,6 +182,56 @@ export function PanelPage() {
 
   const site = panel?.site;
   const total = flatLinks.length;
+  const canDrag = Boolean(me) && !searching;
+
+  function handleDragEnd() {
+    setDragId(null);
+    setDragOverId(null);
+  }
+
+  function handleDrop(target: LinkOut) {
+    const sourceId = dragId;
+    setDragId(null);
+    setDragOverId(null);
+    if (sourceId === null || sourceId === target.id) return;
+    const section = groups.find((group) =>
+      group.links.some((link) => link.id === sourceId),
+    );
+    const sectionLinks = section ? section.links : ungrouped;
+    const ids = sectionLinks.map((link) => link.id);
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(target.id);
+    if (from === -1 || to === -1) {
+      toast.info("拖拽排序仅在同一个分组内生效");
+      return;
+    }
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPanel((current) => {
+      if (!current) return current;
+      const sourceLinks = section ? section.links : current.ungrouped;
+      const byId = new Map(sourceLinks.map((link) => [link.id, link]));
+      const ordered = next
+        .map((id) => byId.get(id))
+        .filter((link): link is LinkOut => Boolean(link));
+      const rest = sourceLinks.filter((link) => !next.includes(link.id));
+      const links = [...ordered, ...rest];
+      if (section) {
+        return {
+          ...current,
+          groups: current.groups.map((group) =>
+            group.id === section.id ? { ...group, links } : group,
+          ),
+        };
+      }
+      return { ...current, ungrouped: links };
+    });
+    linksApi.updateOrder(next).catch(() => {
+      toast.error("排序保存失败，已恢复原顺序");
+      void panelApi.get().then(setPanel).catch(() => undefined);
+    });
+  }
 
   const logout = async () => {
     await authApi.logout().catch(() => undefined);
@@ -454,6 +508,12 @@ export function PanelPage() {
                         listIndex={flatLinks.findIndex(
                           (item) => item.link.id === link.id,
                         )}
+                        draggable={canDrag}
+                        isDragOver={dragOverId === link.id}
+                        onDragStart={(link) => setDragId(link.id)}
+                        onDragOver={(link) => setDragOverId(link.id)}
+                        onDrop={handleDrop}
+                        onDragEnd={handleDragEnd}
                       />
                     ))}
                   </div>
@@ -481,6 +541,12 @@ export function PanelPage() {
                     listIndex={flatLinks.findIndex(
                       (item) => item.link.id === link.id,
                     )}
+                    draggable={canDrag}
+                    isDragOver={dragOverId === link.id}
+                    onDragStart={(link) => setDragId(link.id)}
+                    onDragOver={(link) => setDragOverId(link.id)}
+                    onDrop={handleDrop}
+                    onDragEnd={handleDragEnd}
                   />
                 ))}
               </div>

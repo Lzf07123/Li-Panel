@@ -27,3 +27,33 @@ def test_cross_user_isolation(client, admin):
         == 404
     )
     assert client.delete(f"/api/groups/{gid}", headers=bh).status_code == 404
+
+
+def test_link_order_foreign_id_404(client, admin):
+    a = client.post(
+        "/api/auth/login", json={"username": "admin", "password": "secret123"}
+    )
+    ah = {"Cookie": f"lipanel_session={a.cookies['lipanel_session']}"}
+    conn = client.app.state.db_path
+    from app.db import connect
+    from app.security import hash_password
+    from app.db import connect as _c
+    c = _c(conn)
+    ph, salt = hash_password("secret123")
+    c.execute(
+        "INSERT INTO users (username, password_hash, salt, role) VALUES ('user_b', ?, ?, 'user')",
+        (ph, salt),
+    )
+    c.commit()
+    c.close()
+    b = client.post(
+        "/api/auth/login", json={"username": "user_b", "password": "secret123"}
+    )
+    bh = {"Cookie": f"lipanel_session={b.cookies['lipanel_session']}"}
+    lid = client.post(
+        "/api/links", json={"name": "A", "url_lan": "http://a.com"}, headers=ah
+    ).json()["id"]
+    assert (
+        client.patch("/api/links/order", json={"ordered_ids": [lid]}, headers=bh).status_code
+        == 404
+    )

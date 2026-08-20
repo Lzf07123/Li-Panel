@@ -126,6 +126,11 @@ export const linksApi = {
   update: (id: number, data: Partial<LinkOut> & { name: string; url_lan: string }) =>
     api<LinkOut>(`/api/links/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id: number) => api<void>(`/api/links/${id}`, { method: "DELETE" }),
+  updateOrder: (ordered_ids: number[]) =>
+    api<{ ok: boolean }>("/api/links/order", {
+      method: "PATCH",
+      body: JSON.stringify({ ordered_ids }),
+    }),
 };
 
 export const settingsApi = {

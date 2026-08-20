@@ -7,11 +7,23 @@ export function LinkCard({
   listIndex,
   onActivate,
   onOpenModal,
+  draggable = false,
+  isDragOver = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   link: LinkOut;
   listIndex?: number;
   onActivate?: (link: LinkOut) => void;
   onOpenModal?: (link: LinkOut) => void;
+  draggable?: boolean;
+  isDragOver?: boolean;
+  onDragStart?: (link: LinkOut) => void;
+  onDragOver?: (link: LinkOut) => void;
+  onDrop?: (link: LinkOut) => void;
+  onDragEnd?: () => void;
 }) {
   const href = link.url ? link.url : `/go/${link.id}`;
   const isModal = link.open_mode === "modal";
@@ -25,6 +37,33 @@ export function LinkCard({
       href={href}
       target={target}
       rel={target ? "noreferrer" : undefined}
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (event) => {
+              event.dataTransfer.effectAllowed = "move";
+              onDragStart?.(link);
+            }
+          : undefined
+      }
+      onDragOver={
+        draggable
+          ? (event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              onDragOver?.(link);
+            }
+          : undefined
+      }
+      onDrop={
+        draggable
+          ? (event) => {
+              event.preventDefault();
+              onDrop?.(link);
+            }
+          : undefined
+      }
+      onDragEnd={draggable ? onDragEnd : undefined}
       onClick={(event) => {
         recordRecent(link);
         onActivate?.(link);
@@ -33,7 +72,9 @@ export function LinkCard({
           onOpenModal?.(link);
         }
       }}
-      className="card card-interactive flex items-center gap-3 p-4"
+      className={`card card-interactive flex items-center gap-3 p-4 ${
+        draggable ? "cursor-grab select-none active:cursor-grabbing" : ""
+      } ${isDragOver ? "ring-2 ring-primary" : ""}`}
     >
       {link.icon_type === "upload" && link.icon_value ? (
         <img

@@ -41,6 +41,10 @@ class LinkIn(BaseModel):
     _url_wan = field_validator("url_wan")(_validate_http_url)
 
 
+class OrderIn(BaseModel):
+    ordered_ids: list[int] = Field(min_length=1)
+
+
 def _owned_link(conn: sqlite3.Connection, lid: int, user_id: int) -> sqlite3.Row:
     row = conn.execute(
         "SELECT * FROM links WHERE id = ? AND user_id = ?", (lid, user_id)
@@ -64,6 +68,37 @@ def _link_dict(row: sqlite3.Row) -> dict:
     data = dict(row)
     data["tags"] = json.loads(data["tags"] or "[]")
     return data
+
+
+@router.patch("/order")
+def order_links(
+    body: OrderIn,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """整组写入链接顺序：ordered_ids 必须是本人链接（可含子集），按列表下标重排。"""
+    if len(set(body.ordered_ids)) != len(body.ordered_ids):
+        raise HTTPException(status_code=400, detail="排序列表包含重复项")
+    owned = conn.execute(
+        "SELECT id FROM links WHERE user_id = ? ORDER BY sort_order, id",
+        (user["id"],),
+    ).fetchall()
+    owned_ids = {r["id"] for r in owned}
+    for lid in body.ordered_ids:
+        if lid not in owned_ids:
+            raise HTTPException(status_code=404, detail="快捷方式不存在")
+    # 整体重排：提供的 id 按列表顺序前置，其余链接保持原相对顺序在后，
+    # 避免与默认 sort_order=0 的未参与项产生并列歧义。
+    provided = set(body.ordered_ids)
+    new_order = list(body.ordered_ids) + [
+        r["id"] for r in owned if r["id"] not in provided
+    ]
+    for index, lid in enumerate(new_order):
+        conn.execute(
+            "UPDATE links SET sort_order = ? WHERE id = ? AND user_id = ?",
+            (index, lid, user["id"]),
+        )
+    return {"ok": True}
 
 
 @router.get("")

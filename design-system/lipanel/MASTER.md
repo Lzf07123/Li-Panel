@@ -68,6 +68,10 @@
 - 设置页表格窄屏优化：名称列 `min-w` 保证可读，移动端 `overflow-x-auto` 横向滚动；操作列 `whitespace-nowrap` 防换行
 - 验证：`npx tsc --noEmit && npx vite build` 通过；后端 pytest 35 passed（无后端改动）；Playwright 实测时钟每秒跳动、长标题两行完整显示、四档视口无横向溢出、无断图、对比度无低值
 
+2026-08-21 Phase B（V11–V20）实测：
+
+- V11 链接拖拽排序：`PATCH /api/links/order`（提供 id 前置整体重排，重复 400 / 跨用户 404）；面板卡片 HTML5 组内拖拽，跨分组提示「仅同组生效」，保存失败回滚；`npx tsc --noEmit && npx vite build` 通过，pytest 40 passed，Playwright 组内拖拽端到端（PATCH 200 + 顺序持久化）通过
+
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
 - 后端：pytest 35 passed（认证/SSO/可见性/隔离/站点设置）

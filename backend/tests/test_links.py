@@ -32,3 +32,60 @@ def test_link_group_must_be_owned(client, auth_headers):
         headers=auth_headers,
     )
     assert r.status_code == 404
+
+
+def test_link_order_rewrites_sort(client, auth_headers):
+    ids = []
+    for name in ["A", "B", "C"]:
+        r = client.post(
+            "/api/links",
+            json={"name": name, "url_lan": f"http://x{name}.com"},
+            headers=auth_headers,
+        )
+        ids.append(r.json()["id"])
+    r = client.patch(
+        "/api/links/order", json={"ordered_ids": [ids[2], ids[0], ids[1]]},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    ordered = [l["id"] for l in client.get("/api/links", headers=auth_headers).json()]
+    assert ordered == [ids[2], ids[0], ids[1]]
+
+
+def test_link_order_subset_ok(client, auth_headers):
+    ids = []
+    for name in ["A", "B", "C"]:
+        r = client.post(
+            "/api/links",
+            json={"name": name, "url_lan": f"http://x{name}.com"},
+            headers=auth_headers,
+        )
+        ids.append(r.json()["id"])
+    r = client.patch(
+        "/api/links/order", json={"ordered_ids": [ids[1], ids[0]]},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    ordered = [l["id"] for l in client.get("/api/links", headers=auth_headers).json()]
+    assert ordered[:2] == [ids[1], ids[0]]
+
+
+def test_link_order_duplicate_rejected(client, auth_headers):
+    r = client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": "http://a.com"},
+        headers=auth_headers,
+    )
+    lid = r.json()["id"]
+    assert (
+        client.patch(
+            "/api/links/order", json={"ordered_ids": [lid, lid]}, headers=auth_headers
+        ).status_code
+        == 400
+    )
+
+
+def test_link_order_requires_auth(client):
+    assert (
+        client.patch("/api/links/order", json={"ordered_ids": [1]}).status_code == 401
+    )
