@@ -1404,9 +1404,10 @@ export function SettingsPage() {
             ) : null}
 
             {tab === "personal" ? (
-              <div className="card mx-auto max-w-lg space-y-5 p-6">
-                <div>
-                  <span className="label">{t("语言")}</span>
+              <div className="card space-y-5 p-6 sm:p-8">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <span className="label">{t("语言")}</span>
                   <select
                     className="input"
                     value={lang}
@@ -1431,7 +1432,7 @@ export function SettingsPage() {
                     <option value="light">{t("浅色")}</option>
                     <option value="dark">{t("深色")}</option>
                   </select>
-                </div>
+                  </div>
                 <div>
                   <span className="label">{t("链接模式")}</span>
                   <select
@@ -1445,6 +1446,7 @@ export function SettingsPage() {
                     <option value="lan">{t("内网优先")}</option>
                     <option value="wan">{t("公网优先")}</option>
                   </select>
+                  </div>
                 </div>
                 <div className="rounded-xl bg-surface-2/60 p-4">
                   <p className="text-sm font-medium text-foreground">{t("SSO 绑定")}</p>
