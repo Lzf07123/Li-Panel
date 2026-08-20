@@ -4,7 +4,11 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
+import csv
+import io
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.brand_defaults import get_site_settings
 from app.db import get_db
@@ -190,6 +194,45 @@ def _record_samples(
     conn.execute(
         "DELETE FROM link_health WHERE user_id = ? AND checked_at < ?",
         (user_id, cutoff),
+    )
+
+
+@router.get("/export")
+def export_status(
+    request: Request,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+    format: str = "json",
+):
+    """状态导出（仅本人启用检测的链接），支持 csv / json。"""
+    if format not in {"csv", "json"}:
+        raise HTTPException(status_code=400, detail="format 仅支持 csv 或 json")
+    links = conn.execute(
+        f"SELECT {LINK_COLS} FROM links WHERE user_id = ? AND health_enabled = 1",
+        (user["id"],),
+    ).fetchall()
+    results = _check_many(links)
+    names = {row["id"]: row["name"] for row in links}
+    rows = [
+        {
+            "link_id": item["link_id"],
+            "name": names.get(item["link_id"], ""),
+            "status": item["status"],
+            "ms": item["ms"],
+            "checked_at": item["checked_at"],
+        }
+        for item in results
+    ]
+    if format == "json":
+        return JSONResponse(rows)
+    buffer = io.StringIO()
+    writer = csv.DictWriter(
+        buffer, fieldnames=["link_id", "name", "status", "ms", "checked_at"]
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    return PlainTextResponse(
+        buffer.getvalue(), media_type="text/csv; charset=utf-8"
     )
 
 

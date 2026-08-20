@@ -446,3 +446,59 @@ def test_health_config_roundtrip(client, auth_headers, health_server):
         headers=auth_headers,
     )
     assert r2.json()["health_enabled"] == 0
+
+
+def test_export_json(client, auth_headers, health_server):
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    r = client.get("/api/health/export?format=json", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "A" and data[0]["status"] == "up"
+
+
+def test_export_csv(client, auth_headers, health_server):
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    r = client.get("/api/health/export?format=csv", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.text.splitlines()[0] == "link_id,name,status,ms,checked_at"
+
+
+def test_export_bad_format(client, auth_headers):
+    assert (
+        client.get("/api/health/export?format=xml", headers=auth_headers).status_code
+        == 400
+    )
+
+
+def test_export_isolation(client, auth_headers, health_server):
+    from app.db import connect
+    from app.security import hash_password
+
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    conn = connect(client.app.state.db_path)
+    ph, salt = hash_password("secret123")
+    conn.execute(
+        "INSERT INTO users (username, password_hash, salt, role) VALUES ('user_b', ?, ?, 'user')",
+        (ph, salt),
+    )
+    conn.commit()
+    conn.close()
+    b = client.post(
+        "/api/auth/login", json={"username": "user_b", "password": "secret123"}
+    )
+    bh = {"Cookie": f"lipanel_session={b.cookies['lipanel_session']}"}
+    assert client.get("/api/health/export?format=json", headers=bh).json() == []
