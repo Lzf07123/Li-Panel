@@ -107,7 +107,9 @@ CREATE TABLE IF NOT EXISTS site_settings (
 
 
 def connect(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
+    # FastAPI 同步依赖可能在不同线程池线程中执行，同一请求的连接串行使用，
+    # 因此关闭 SQLite 的跨线程检查（每个请求拥有独立连接，无并发共享）。
+    conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
