@@ -1,6 +1,6 @@
 # Li&Panel 品牌方案（BRAND.md）
 
-日期：2026-08-20 ｜ 状态：已实例化（V1.2 海玻璃）
+日期：2026-08-20 ｜ 状态：已实例化（V1.4 海玻璃，与 Li-Design 子模块对齐）
 
 ## 1. 品牌内核（继承 Li&Design，不变层）
 
@@ -21,25 +21,24 @@
 | 5 | 人格比喻 | 安静的私人领航员 | 可靠、克制 |
 | 6 | 符号隐喻 | 见 §1 | 家庭符号重映射 |
 | 7–8 | 主色（浅/深） | `#25786D` / `#7FD4C6`（hover `#1F6359`/`#A5E4D9`，soft `#D9F4EE`/`rgba(127,212,198,.16)`，fg `#FFFFFF`/`#17332E`） | 海玻璃家族色 |
-| 9–10 | 中性色（浅/深） | 模板原值（浅 `#F6FBF9/#FFFFFF/#EEF6F3/#35423F/#71807A/#E1ECE8`；深 `#3A3F45/#434950/#4B5259/#F0F2F4/#B8C0C7/#545C64`） | D1 雾灰不压黑 |
-| 11 | 语义色 | 模板原值（success/warning/destructive + soft） | 只表达状态 |
+| 9–10 | 中性色（浅/深） | 模板 V1.4 默认（浅 `#F6FBF9/#FFFFFF/#EEF6F3/#35423F/#64736C/#E1ECE8`；深 `#3A3F45/#434950/#4B5259/#F0F2F4/#B8C0C7/#545C64`） | D1 雾灰不压黑；浅色 muted 用 V1.3 AA 调校值 |
+| 11 | 语义色 | 模板 V1.4 默认（浅 `#2A7C52/#9A5C05/#C43737` + soft；深 `#86D6AC/#EAD48E/#E8A49A`；深色带文字软底用 `*-soft-solid`/`*-soft-fg`） | V1.3 AA 调校值，只表达状态 |
 | 12 | 焦点环 | `--lipanel-ring`（浅 `#25786D`，深 `#7FD4C6`），`focus-visible` 2px + 2px offset | 无障碍底线 |
 | 13 | 字体 | Inter → ui-sans-serif → system → PingFang SC / 微软雅黑 | 不加载远程字体 |
 | 14 | 标题字体 | 不额外引入 | 低占用优先 |
 | 15 | Logo/favicon | 占位透明 WebP（待用户提供正式素材） | 用户尚未提供 |
-| 16 | 令牌前缀 | `lipanel` | 唯一前缀 |
-| 16b | 令牌前缀（1:1 复刻） | `portal`（与 Li&Pass 参考实现逐字一致，含 `--portal-*` 与主题键 `portal-theme`） | 用户明确要求完全 1:1 复刻参考实现 |
-| 17 | 主题存储键 | `lipanel-theme` | 首帧脚本与 useTheme 共用 |
+| 16 | 令牌前缀 | `lipanel`（从 `reusable-tokens.template.css` V1.4 实例化，仅槽位差） | 唯一前缀；模板实现总览要求 Panel 纠正 1:1 复制反例 |
+| 17 | 主题存储键 | `lipanel-theme`（旧 `portal-theme` 仅作迁移回退） | 首帧脚本与 useTheme 共用 |
 | 18 | slogan/备案 | slogan 见槽位 3，写入 `brand.ts`；备案上线前留空 | 单一事实来源 |
 | 19 | 氛围浓度 | 认证页 10 + TechAmbience 默认；面板视图 10（soft）；管理 4×0.5 | 模板 §4.3 |
 | 20 | 浏览器品牌位 | `index.html`：favicon、明暗 theme-color、description、首帧主题脚本 | 模板 §4.1 |
 | 21 | 强调色板 | 模板六色板（ice/aqua/lilac/sage/mint/sand），实体→色相稳定哈希 | 瓦片/图标小面积 |
-| 22 | 按钮与光效 | 半透明单色按钮 + 细描边；TechAmbience 可见但克制 | 模板 V1.2 |
+| 22 | 按钮与光效 | 半透明单色按钮 + 细描边 + 扫光；TechAmbience 可见但克制 | 模板 V1.4 |
 
 ## 3. 治理与后台覆盖扩展（§13.5）
 
 - 用户明确要求 Logo 等可见信息后台可改：`brand.ts` 保存设计默认值，首次启动种子写入 `site_settings`；运行时以 `site_settings` 为事实来源，清空回退默认。
-- 用户明确要求完全 1:1 复刻 Li&Pass 参考实现：`frontend/src`、`index.css`（`--portal-*` 令牌）、组件库、动效与 CSP 行为均与参考实现一致；仅品牌文案与页面路由按 Li&Panel 适配。
+- 2026-08-20 用户要求视觉设计对齐 Li-Design 子模块：从 `reusable-tokens.template.css`（V1.4）重新实例化 `frontend/src/index.css`，令牌前缀统一为 `lipanel`，采用 V1.3 AA 调校语义色、深色软底实色粉彩与 V1.4 全量 UI 控件；此前按用户要求 1:1 复刻 Li&Pass（`--portal-*`）被子模块实现总览标记为反例，本次已纠正为「仅槽位差」实例化，旧主题键 `portal-theme` 仅作一次性迁移回退。
 - 令牌（颜色/阴影/动效）只存在 `frontend/src/index.css`，后台不可改。
 - 代码与文档冲突时以代码为事实，并回写本文档。
 - 视觉变更流程：先在本文档写意图与理由 → 以令牌落地 → 更新 MASTER.md → 过第 6 章清单。

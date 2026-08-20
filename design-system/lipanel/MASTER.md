@@ -1,22 +1,25 @@
 # Li&Panel 实现速览（MASTER.md）
 
-日期：2026-08-20
+日期：2026-08-20 ｜ 版本：V1.4（与 Li-Design 子模块对齐）
 
 ## 令牌（事实来源：`frontend/src/index.css`，前缀 `lipanel`）
 
-- 令牌前缀：`portal`（1:1 复刻 Li&Pass 参考实现，逐字一致）
-- 浅色：bg `#f6fbf9`、surface `#ffffff`、surface-2 `#eef6f3`、fg `#35423f`、muted `#71807a`、border `#e1ece8`、primary `#25786d`、ring `#25786d`
+- 令牌前缀：`lipanel`（从 Li-Design `reusable-tokens.template.css` V1.4 实例化，仅槽位差）
+- 浅色：bg `#f6fbf9`、surface `#ffffff`、surface-2 `#eef6f3`、fg `#35423f`、muted `#64736c`、border `#e1ece8`、primary `#25786d`、ring `#25786d`
+- 浅色语义色：success `#2a7c52` / warning `#9a5c05` / destructive `#c43737`（V1.3 AA 调校值）
 - 深色：bg `#3a3f45`、surface `#434950`、surface-2 `#4b5259`、fg `#f0f2f4`、muted `#b8c0c7`、border `#545c64`、primary `#7fd4c6`、ring `#7fd4c6`
+- 深色软底带文字组件回退 `*-soft-solid` + `*-soft-fg`（primary `#d9f4ee/#17332e`、success `#e3f6e9/#14532d`、warning `#fdf3d8/#78350f`、destructive `#fdeeee/#7f1d1d`）
 - 按钮：半透明单色（浅 10%/深 13%）+ 细描边 + `::after` 扫光
 - 阴影：`--shadow-sm/md/lg` 水绿 tint，透明度总和 < 0.1
 - 动效：`--motion-fast/base/slow = 150/250/350ms`；只动 transform/opacity/background-position
-- 科技光效：网格 12s、光束 10s（错峰 0.8/4.2/7.5s）、光点 6s；`prefers-reduced-motion` 单帧
+- 科技光效：网格 12s、光束 10s（错峰 0.8/4.2/7.5s）、光点 6s；极光四斑 18/22/28/24s；`prefers-reduced-motion` 单帧
 
 ## 组件清单
 
-- 组件全部 1:1 复刻自 Li&Pass 参考实现：`AuthShell`/`AppHeader`/`AsyncButton`/`PasswordInput`/`Notice`/`Modal`/`ConfirmDialog`/`ToastProvider`/`ScrollTabs`/`PillTabs`/`MagicBento`/`StrokeText`/`SiteFooter`/`ThemeToggle`/`PageSkeleton`/`AuthSkeleton`/`GuestOnly`/`Brand` 及 `bits/*`（Aurora/BlurText/CountUp/FadeIn/LineIcon/ShinyText/StatusIcon/TechAmbience）
+- 组件按 Li-Design 模板 V1.4 实例化，令牌统一为 `--lipanel-*`：`AuthShell`/`AppHeader`/`AsyncButton`/`PasswordInput`/`Notice`/`Modal`/`ConfirmDialog`/`ToastProvider`/`ScrollTabs`/`PillTabs`/`MagicBento`/`StrokeText`/`SiteFooter`/`ThemeToggle`/`PageSkeleton`/`AuthSkeleton`/`GuestOnly`/`Brand` 及 `bits/*`（Aurora/BlurText/CountUp/FadeIn/LineIcon/ShinyText/StatusIcon/TechAmbience）
+- 随模板补全 V1.4 UI 控件：`.select`/`.select-sm`、`.custom-select-*`、`.dropdown-menu`、`.suggest-menu`、`.avatar`、复选/单选/文件按钮、`.pagination`、`.breadcrumb`、`.progress`、`.table-empty-row`
 - 氛围：`FloatingBackground`（Canvas + `useFloatingBackground`，参考实现逐字一致）、`AuroraBackground`、`TechAmbience`
-- 主题：`useTheme` + `ThemeToggle` 读写 `portal-theme`，切换 `html.dark`（与参考实现一致）
+- 主题：`useTheme` + `ThemeToggle` 读写 `lipanel-theme`，切换 `html.dark`；旧 `portal-theme` 仅作迁移回退
 
 ## 响应式
 
@@ -34,12 +37,18 @@
 
 ## 验收状态
 
-2026-08-20 首版交付实测（含全量设计升级）：
+2026-08-20 V1.4 对齐实测：
+
+- 前端：`npx tsc --noEmit && npx vite build` 通过，产物 CSS 含 `--lipanel-*` 令牌与 V1.4 控件类，无 `--portal-*` 残留
+- 后端：pytest 35 passed（视觉改动不涉及后端，回归通过）
+- 一致性：模板占位符清零；`--lipanel-*` 令牌集合与模板一致；每个 `animation` 均有 `@keyframes`；浅色语义色为 V1.3 AA 调校值
+- 主题：存储键迁移为 `lipanel-theme`，旧 `portal-theme` 仅作一次性回退
+- 视觉对照：四档响应式与对比度建议在浏览器中人工复核
+
+2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
 - 后端：pytest 35 passed（认证/SSO/可见性/隔离/站点设置）
 - 前端：`tsc -b` + `vite build` 通过（参考实现构建链，含 precompress）
 - 容器：`docker stats` 实测内存 46.09MiB、CPU 0.21%、2 个进程（目标 50–90MB，达标）
 - 端到端：初始化管理员 → 登录 → 建分组/链接 → 访客面板（私密不可见、URL 隐藏）→ `/go/{id}` 302 跳转 全部通过
 - 加速源：`IMAGE_REGISTRY=docker.m.daocloud.io/library` 完成镜像构建验证
-
-视觉对照 Li&Design 第 6 章清单的自动化部分已核对；四档响应式与对比度建议在浏览器中人工复核。

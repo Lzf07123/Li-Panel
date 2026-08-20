@@ -21,7 +21,7 @@ export function ShinyText({
   text,
   className = "",
   color = "currentColor",
-  shineColor = "var(--portal-primary)",
+  shineColor = "var(--lipanel-primary)",
   spread = 90,
   duration = 5,
 }: ShinyTextProps) {

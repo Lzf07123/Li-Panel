@@ -13,7 +13,7 @@ export function ScrollTabs({
   children,
   className = "",
   activeSelector = '[aria-current="page"], [aria-selected="true"]',
-  fadeColor = "var(--portal-bg)",
+  fadeColor = "var(--lipanel-bg)",
 }: {
   children: ReactNode;
   /** 作用在外层容器；管理后台等页面可传入负外边距实现移动端通栏。 */

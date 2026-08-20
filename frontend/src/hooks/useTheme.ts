@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 
-export const THEME_STORAGE_KEY = "portal-theme";
+export const THEME_STORAGE_KEY = "lipanel-theme";
+
+/** 1:1 复刻期的旧存储键，仅作迁移回退，不再写入 */
+const LEGACY_THEME_STORAGE_KEY = "portal-theme";
 
 type Theme = "light" | "dark";
 
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const stored =
+      window.localStorage.getItem(THEME_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     /* localStorage 不可用时回退到系统偏好 */

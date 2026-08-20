@@ -5,8 +5,8 @@
   max-width: 100%;
   gap: 3px;
   padding: 5px;
-  background: var(--portal-surface-2);
-  border: 1px solid var(--portal-border);
+  background: var(--lipanel-surface-2);
+  border: 1px solid var(--lipanel-border);
   border-radius: 9999px;
 }
 
@@ -18,8 +18,8 @@
   height: 38px;
   padding: 0 17px;
   border-radius: 9999px;
-  background: var(--portal-surface);
-  color: var(--portal-muted);
+  background: var(--lipanel-surface);
+  color: var(--lipanel-muted);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
@@ -34,7 +34,7 @@
   left: 50%;
   bottom: 0;
   border-radius: 50%;
-  background: var(--portal-primary);
+  background: var(--lipanel-primary);
   z-index: 0;
   display: block;
   pointer-events: none;
@@ -59,12 +59,12 @@
   position: absolute;
   left: 0;
   top: 0;
-  color: var(--portal-primary-fg);
+  color: var(--lipanel-primary-fg);
 }
 
 .pill-tab.is-active {
-  background: var(--portal-primary);
-  color: var(--portal-primary-fg);
+  background: var(--lipanel-primary);
+  color: var(--lipanel-primary-fg);
 }
 
 /* 活动标签流动扫光：与主按钮同一节奏，标签文字始终压在光层之上 */

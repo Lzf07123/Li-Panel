@@ -9,10 +9,10 @@ export function AuroraBackground({ className = "" }: { className?: string }) {
       aria-hidden="true"
       className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
     >
-      <div className="aurora-blob aurora-blob-1" />
-      <div className="aurora-blob aurora-blob-2" />
-      <div className="aurora-blob aurora-blob-3" />
-      <div className="aurora-blob aurora-blob-4" />
+      <div className="aurora-blob" />
+      <div className="aurora-blob" />
+      <div className="aurora-blob" />
+      <div className="aurora-blob" />
     </div>
   );
 }

@@ -41,12 +41,12 @@ export type StrokeTextProps = {
 /**
  * React Bits StrokeText 的 TypeScript 移植版：
  * 每个字符先沿轮廓描边绘制，再从左向右擦入填充色。
- * 颜色允许传入 CSS 变量（如 var(--portal-primary)），以便自动跟随明暗主题。
+ * 颜色允许传入 CSS 变量（如 var(--lipanel-primary)），以便自动跟随明暗主题。
  */
 export function StrokeText({
   text = DEFAULT_TEXT,
-  strokeColor = "var(--portal-primary)",
-  fillColor = "var(--portal-fg)",
+  strokeColor = "var(--lipanel-primary)",
+  fillColor = "var(--lipanel-fg)",
   strokeWidth = 1.4,
   drawDuration = 1.6,
   fillDelay = 0.2,

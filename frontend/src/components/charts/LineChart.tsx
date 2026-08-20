@@ -21,12 +21,12 @@ interface LineChartProps {
 }
 
 const DEFAULT_COLORS = [
-  "var(--portal-primary)",
-  "var(--portal-accent-aqua)",
-  "var(--portal-accent-lilac)",
-  "var(--portal-accent-sage)",
-  "var(--portal-accent-mint)",
-  "var(--portal-accent-ice)",
+  "var(--lipanel-primary)",
+  "var(--lipanel-accent-aqua)",
+  "var(--lipanel-accent-lilac)",
+  "var(--lipanel-accent-sage)",
+  "var(--lipanel-accent-mint)",
+  "var(--lipanel-accent-ice)",
 ];
 
 const PADDING = { top: 16, right: 12, bottom: 28, left: 42 };
@@ -183,7 +183,7 @@ export function LineChart({
                   item.color ??
                   DEFAULT_COLORS[seriesIndex % DEFAULT_COLORS.length]
                 }
-                stroke="var(--portal-surface)"
+                stroke="var(--lipanel-surface)"
                 strokeWidth={1.5}
               />
             ))}

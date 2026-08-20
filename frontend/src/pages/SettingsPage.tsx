@@ -210,7 +210,7 @@ export function SettingsPage() {
           }
         />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
-          <ScrollTabs fadeColor="var(--portal-bg)">
+          <ScrollTabs fadeColor="var(--lipanel-bg)">
             {TABS.map((item) => (
               <button
                 key={item.key}

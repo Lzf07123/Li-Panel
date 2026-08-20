@@ -138,7 +138,7 @@ export function PillTabs({
   return (
     <ScrollTabs
       className={`pill-tabs ${className}`.trim()}
-      fadeColor="var(--portal-surface-2)"
+      fadeColor="var(--lipanel-surface-2)"
     >
       {items.map((item, index) => {
         const active = item.key === activeKey;

@@ -203,9 +203,9 @@ export function ChinaMap({
               d={region.d}
               data-name={name}
               data-value={String(value)}
-              fill="var(--portal-primary)"
+              fill="var(--lipanel-primary)"
               fillOpacity={opacity}
-              stroke="var(--portal-border)"
+              stroke="var(--lipanel-border)"
               strokeWidth={0.7}
               strokeLinejoin="round"
               onMouseEnter={(event) => handleMove(event, name, value)}
@@ -248,7 +248,7 @@ export function ChinaMap({
           >
             <span
               className="inline-block h-3 w-4 rounded-sm"
-              style={{ backgroundColor: "var(--portal-primary)", opacity: 0 }}
+              style={{ backgroundColor: "var(--lipanel-primary)", opacity: 0 }}
               aria-hidden="true"
             />
             0
@@ -260,7 +260,7 @@ export function ChinaMap({
             >
               <span
                 className="inline-block h-3 w-4 rounded-sm"
-                style={{ backgroundColor: "var(--portal-primary)", opacity }}
+                style={{ backgroundColor: "var(--lipanel-primary)", opacity }}
                 aria-hidden="true"
               />
               {index === OPACITY_STEPS.length - 1

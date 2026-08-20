@@ -3,7 +3,9 @@
 // 内联脚本会被拦截；Vite 会把 public/ 原样拷入构建产物根目录。
 (function () {
   try {
-    var stored = localStorage.getItem("portal-theme");
+    var stored =
+      localStorage.getItem("lipanel-theme") ||
+      localStorage.getItem("portal-theme");
     var dark = stored
       ? stored === "dark"
       : window.matchMedia("(prefers-color-scheme: dark)").matches;

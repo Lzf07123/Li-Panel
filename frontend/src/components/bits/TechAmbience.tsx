@@ -6,14 +6,14 @@ const DOTS: Array<{
   color: string;
   delay: string;
 }> = [
-  { left: "14%", top: "18%", color: "var(--portal-accent-ice)", delay: "0s" },
-  { left: "84%", top: "16%", color: "var(--portal-accent-lilac)", delay: "2.3s" },
-  { left: "9%", top: "70%", color: "var(--portal-accent-aqua)", delay: "4.3s" },
-  { left: "78%", top: "72%", color: "var(--portal-accent-sage)", delay: "1.3s" },
-  { left: "47%", top: "11%", color: "var(--portal-accent-mint)", delay: "5.7s" },
-  { left: "36%", top: "86%", color: "var(--portal-accent-sand)", delay: "7s" },
-  { left: "64%", top: "58%", color: "var(--portal-accent-aqua)", delay: "3.3s" },
-  { left: "24%", top: "44%", color: "var(--portal-accent-ice)", delay: "8.3s" },
+  { left: "14%", top: "18%", color: "var(--lipanel-accent-ice)", delay: "0s" },
+  { left: "84%", top: "16%", color: "var(--lipanel-accent-lilac)", delay: "2.3s" },
+  { left: "9%", top: "70%", color: "var(--lipanel-accent-aqua)", delay: "4.3s" },
+  { left: "78%", top: "72%", color: "var(--lipanel-accent-sage)", delay: "1.3s" },
+  { left: "47%", top: "11%", color: "var(--lipanel-accent-mint)", delay: "5.7s" },
+  { left: "36%", top: "86%", color: "var(--lipanel-accent-sand)", delay: "7s" },
+  { left: "64%", top: "58%", color: "var(--lipanel-accent-aqua)", delay: "3.3s" },
+  { left: "24%", top: "44%", color: "var(--lipanel-accent-ice)", delay: "8.3s" },
 ];
 
 /**
