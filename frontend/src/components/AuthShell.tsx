@@ -40,7 +40,11 @@ export function AuthShell({
       {/* 科技氛围层：缓移网格 + 扫掠光束 + 呼吸光点（主界面光效） */}
       <TechAmbience />
 
-      <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-10">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="relative flex flex-1 flex-col items-center justify-center px-4 py-10 outline-none"
+      >
         <div className="w-full max-w-md">
           <div
             className="animate-fade-up-slow mb-8 flex w-full flex-col items-center gap-3 text-center"
@@ -83,7 +87,7 @@ export function AuthShell({
         <p className="mt-8 text-center text-xs text-muted">
           <ShinyText text={`${APP_NAME} · ${APP_TAGLINE}`} duration={7} />
         </p>
-      </div>
+      </main>
 
       <div
         className="animate-fade-up-slow relative"

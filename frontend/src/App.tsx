@@ -44,6 +44,12 @@ export function AppRoutes() {
       key={location.pathname}
       className={firstRender.current ? "min-h-screen" : "page-enter min-h-screen"}
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:text-foreground focus:shadow-md"
+      >
+        跳到主要内容
+      </a>
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />

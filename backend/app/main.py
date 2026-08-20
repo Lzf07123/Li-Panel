@@ -33,7 +33,8 @@ def _build_csp(settings: Settings) -> str:
     return (
         f"default-src 'self'; connect-src 'self'; "
         f"img-src 'self' data:; style-src {style_src}; object-src 'none'; "
-        f"base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        f"base-uri 'self'; form-action 'self'; frame-src 'self' https: http:; "
+        f"frame-ancestors 'none'"
     )
 
 

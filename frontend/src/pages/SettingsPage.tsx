@@ -12,6 +12,7 @@ import { SiteFooter } from "../components/SiteFooter";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useTheme } from "../hooks/useTheme";
 import { useToast } from "../hooks/useToast";
+import { formatTags, parseTags } from "../lib/tags";
 
 type Tab = "site" | "manage" | "personal";
 
@@ -30,6 +31,8 @@ const emptyLinkForm = {
   description: "",
   is_public: false,
   guest_url_mode: "hidden" as "hidden" | "show",
+  open_mode: "new_tab" as "new_tab" | "modal",
+  tags: [] as string[],
 };
 
 export function SettingsPage() {
@@ -145,7 +148,8 @@ export function SettingsPage() {
       description: linkForm.description,
       is_public: linkForm.is_public,
       guest_url_mode: linkForm.guest_url_mode,
-      tags: [],
+      open_mode: linkForm.open_mode,
+      tags: linkForm.tags,
     };
     if (linkForm.id === null) {
       await linksApi.create(body);
@@ -162,8 +166,13 @@ export function SettingsPage() {
       await linksApi.update(link.id, {
         name: link.name,
         url_lan: link.url_lan,
+        url_wan: link.url_wan,
+        group_id: link.group_id,
+        description: link.description,
+        tags: link.tags,
         is_public: !link.is_public,
         guest_url_mode: link.guest_url_mode,
+        open_mode: link.open_mode,
       });
       setLinks(await linksApi.list());
       toast.success(`「${link.name}」已${link.is_public ? "私密" : "公开"}`);
@@ -209,7 +218,11 @@ export function SettingsPage() {
             </button>
           }
         />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:px-6 lg:px-8"
+        >
           <ScrollTabs fadeColor="var(--lipanel-bg)">
             {TABS.map((item) => (
               <button
@@ -508,6 +521,36 @@ export function SettingsPage() {
                       setLinkForm({ ...linkForm, description: e.target.value })
                     }
                   />
+                  <input
+                    className="input sm:col-span-2"
+                    placeholder="标签，用逗号分隔（最多 8 个）"
+                    value={formatTags(linkForm.tags)}
+                    onChange={(e) =>
+                      setLinkForm({ ...linkForm, tags: parseTags(e.target.value) })
+                    }
+                  />
+                  {linkForm.tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 sm:col-span-2">
+                      {linkForm.tags.map((tag) => (
+                        <span key={tag} className="badge badge-muted gap-1">
+                          {tag}
+                          <button
+                            type="button"
+                            aria-label={`移除标签 ${tag}`}
+                            className="text-muted transition-colors hover:text-destructive"
+                            onClick={() =>
+                              setLinkForm({
+                                ...linkForm,
+                                tags: linkForm.tags.filter((t) => t !== tag),
+                              })
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                     <input
                       type="checkbox"
@@ -531,6 +574,19 @@ export function SettingsPage() {
                   >
                     <option value="hidden">访客隐藏 URL（/go 跳转）</option>
                     <option value="show">访客直接显示 URL</option>
+                  </select>
+                  <select
+                    className="input"
+                    value={linkForm.open_mode}
+                    onChange={(e) =>
+                      setLinkForm({
+                        ...linkForm,
+                        open_mode: e.target.value as "new_tab" | "modal",
+                      })
+                    }
+                  >
+                    <option value="new_tab">新标签页打开</option>
+                    <option value="modal">内置窗口打开</option>
                   </select>
                   <AsyncButton
                     type="submit"
@@ -596,6 +652,8 @@ export function SettingsPage() {
                                       description: link.description,
                                       is_public: link.is_public,
                                       guest_url_mode: link.guest_url_mode,
+                                      open_mode: link.open_mode,
+                                      tags: link.tags,
                                     })
                                   }
                                 >

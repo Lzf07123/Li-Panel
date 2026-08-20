@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { authApi, panelApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
+import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
+import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
 import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
+import { CommandPalette } from "../components/CommandPalette";
 import { LinkCard } from "../components/LinkCard";
+import { LinkPreviewModal } from "../components/LinkPreviewModal";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { SiteFooter } from "../components/SiteFooter";
 import { AuroraBackground } from "../components/bits/AuroraBackground";
 import { BlurText } from "../components/bits/BlurText";
-import { CountUp } from "../components/bits/CountUp";
 import { FloatingBackground } from "../components/FloatingBackground";
 import { TechAmbience } from "../components/bits/TechAmbience";
 
@@ -29,25 +32,151 @@ export function PanelPage() {
   const [panel, setPanel] = useState<PanelOut | null>(null);
   const [me, setMe] = useState<MeOut | null>(null);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [recents, setRecents] = useState<RecentItem[]>(getRecent);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [previewLink, setPreviewLink] = useState<LinkOut | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(
+    loadCollapsedGroups,
+  );
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     authApi.meSilent().then(setMe).catch(() => setMe(null));
     panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, []);
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const groups = useMemo(
     () =>
       (panel?.groups ?? []).map((group) => ({
         ...group,
-        links: group.links.filter((link) => matches(link, query)),
+        links: group.links.filter(
+          (link) =>
+            matches(link, query) &&
+            (tagFilter === null || link.tags.includes(tagFilter)),
+        ),
       })),
-    [panel, query],
+    [panel, query, tagFilter],
   );
-  const ungrouped = (panel?.ungrouped ?? []).filter((link) => matches(link, query));
+  const ungrouped = (panel?.ungrouped ?? []).filter(
+    (link) =>
+      matches(link, query) && (tagFilter === null || link.tags.includes(tagFilter)),
+  );
+  const searching = Boolean(query.trim()) || tagFilter !== null;
+  const isGroupCollapsed = (groupId: number) =>
+    !searching && collapsedGroups.has(groupId);
+  const allTags = useMemo(() => {
+    const links = [
+      ...(panel?.groups ?? []).flatMap((group) => group.links),
+      ...(panel?.ungrouped ?? []),
+    ];
+    return Array.from(new Set(links.flatMap((link) => link.tags))).sort((a, b) =>
+      a.localeCompare(b, "zh-CN"),
+    );
+  }, [panel]);
+  const allLinks = useMemo(
+    () => [
+      ...(panel?.groups ?? []).flatMap((group) => group.links),
+      ...(panel?.ungrouped ?? []),
+    ],
+    [panel],
+  );
+  const recentLinks = useMemo(() => {
+    const byId = new Map(allLinks.map((link) => [link.id, link]));
+    return recents
+      .map((item) => byId.get(item.id))
+      .filter((link): link is LinkOut => Boolean(link));
+  }, [recents, allLinks]);
+  const flatLinks = useMemo(() => {
+    const items: { link: LinkOut; id: string }[] = [];
+    for (const group of groups) {
+      if (isGroupCollapsed(group.id)) continue;
+      for (const link of group.links) {
+        items.push({ link, id: `panel-link-${items.length}` });
+      }
+    }
+    for (const link of ungrouped) {
+      items.push({ link, id: `panel-link-${items.length}` });
+    }
+    return items;
+  }, [groups, ungrouped, collapsedGroups, searching]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target !== null &&
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+      if (
+        event.key === "/" &&
+        !typing &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
+      if (
+        event.key === "Escape" &&
+        document.activeElement === searchRef.current
+      ) {
+        if (query) {
+          setQuery("");
+        } else {
+          searchRef.current?.blur();
+        }
+        return;
+      }
+      if (document.activeElement !== searchRef.current || flatLinks.length === 0) {
+        return;
+      }
+      const moveTo = (next: number) => {
+        event.preventDefault();
+        const clamped =
+          next < 0 ? flatLinks.length - 1 : next >= flatLinks.length ? 0 : next;
+        setActiveIndex(clamped);
+        const el = document.getElementById(flatLinks[clamped].id);
+        el?.focus();
+        el?.scrollIntoView({ block: "nearest" });
+      };
+      if (event.key === "ArrowDown") {
+        moveTo(activeIndex + 1);
+      } else if (event.key === "ArrowUp") {
+        moveTo(activeIndex - 1);
+      } else if (event.key === "Home") {
+        moveTo(0);
+      } else if (event.key === "End") {
+        moveTo(flatLinks.length - 1);
+      } else if (event.key === "Enter" && activeIndex >= 0) {
+        event.preventDefault();
+        document.getElementById(flatLinks[activeIndex].id)?.click();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [query, flatLinks, activeIndex]);
+
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [query, tagFilter, panel]);
+
   const site = panel?.site;
-  const total =
-    (panel?.groups.reduce((sum, group) => sum + group.links.length, 0) ?? 0) +
-    ungrouped.length;
+  const total = flatLinks.length;
 
   const logout = async () => {
     await authApi.logout().catch(() => undefined);
@@ -87,7 +216,11 @@ export function PanelPage() {
             )
           }
         />
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 outline-none sm:px-6 lg:px-8"
+        >
           {site ? (
             <section className="mb-10 flex flex-col items-center gap-3 text-center">
               <Brand className="brand-halo h-14 w-14" />
@@ -105,8 +238,10 @@ export function PanelPage() {
               {site.description ? (
                 <p className="max-w-xl text-sm text-muted">{site.description}</p>
               ) : null}
-              <span className="badge badge-muted mt-1">
-                共 <CountUp to={total} /> 个快捷方式
+              <span className="badge badge-muted mt-1" aria-live="polite">
+                {query.trim()
+                  ? `找到 ${total} 个结果`
+                  : `共 ${total} 个快捷方式`}
               </span>
             </section>
           ) : null}
@@ -125,26 +260,196 @@ export function PanelPage() {
               <path d="m20 20-3.5-3.5" />
             </svg>
             <input
+              ref={searchRef}
               type="search"
               className="input pl-9"
               placeholder="搜索名称、描述、标签…"
+              aria-label="搜索快捷方式"
+              title="按 / 聚焦；Ctrl/⌘ + K 打开命令面板"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-[10px] leading-none text-muted">
+              /
+            </kbd>
           </div>
+
+          {allTags.length > 0 ? (
+            <div
+              role="group"
+              aria-label="按标签筛选"
+              className="mx-auto mb-8 flex max-w-2xl flex-wrap items-center justify-center gap-2"
+            >
+              <button
+                type="button"
+                aria-pressed={tagFilter === null}
+                className={`badge cursor-pointer border ${
+                  tagFilter === null ? "badge-primary" : "badge-muted"
+                }`}
+                onClick={() => setTagFilter(null)}
+              >
+                全部
+              </button>
+              {allTags.map((tag) => {
+                const active = tagFilter === tag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={active}
+                    className={`badge cursor-pointer border ${
+                      active ? "badge-primary" : "badge-muted"
+                    }`}
+                    onClick={() => setTagFilter(active ? null : tag)}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {query.trim() && total === 0 ? (
+            <div className="card mx-auto mb-10 max-w-md p-8 text-center">
+              <p className="text-sm font-medium text-foreground">
+                没有找到匹配的快捷方式
+              </p>
+              <p className="mt-1 text-xs text-muted">用外部搜索引擎继续：</p>
+              <div className="mt-4 flex justify-center gap-2">
+                <a
+                  className="btn btn-ghost h-9 px-4"
+                  href={`https://www.bing.com/search?q=${encodeURIComponent(query.trim())}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Bing 搜索
+                </a>
+                <a
+                  className="btn btn-ghost h-9 px-4"
+                  href={`https://www.google.com/search?q=${encodeURIComponent(query.trim())}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Google 搜索
+                </a>
+              </div>
+            </div>
+          ) : null}
+
+          {!query.trim() && tagFilter === null && total === 0 ? (
+            <div className="card mx-auto mb-10 max-w-md p-10 text-center">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="mx-auto h-10 w-10 text-muted"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+              </svg>
+              <p className="mt-4 text-sm font-medium text-foreground">
+                {me ? "还没有快捷方式" : "这里还没有公开内容"}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {me
+                  ? "去管理页添加你的第一个快捷方式。"
+                  : "登录后即可收藏常用入口。"}
+              </p>
+              <div className="mt-5">
+                <Link
+                  to={me ? "/settings" : "/login"}
+                  className="btn btn-primary h-9 px-4"
+                >
+                  {me ? "去添加" : "登录"}
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
+          {!query.trim() && tagFilter === null && recentLinks.length > 0 ? (
+            <section className="mb-8">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-muted">
+                  <span className="h-px w-4 bg-border" />
+                  最近使用
+                </h2>
+                <button
+                  type="button"
+                  className="btn btn-ghost h-7 px-2 text-xs"
+                  onClick={() => {
+                    clearRecent();
+                    setRecents([]);
+                  }}
+                >
+                  清空
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {recentLinks.map((link) => (
+                  <LinkCard
+                    key={link.id}
+                    link={link}
+                    onActivate={(activated) => setRecents(recordRecent(activated))}
+                    onOpenModal={setPreviewLink}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {groups.map((group) =>
             group.links.length === 0 ? null : (
               <section key={group.id} className="mb-8">
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
+                <button
+                  type="button"
+                  aria-expanded={!isGroupCollapsed(group.id)}
+                  className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted transition-colors hover:text-foreground"
+                  onClick={() =>
+                    setCollapsedGroups((current) =>
+                      toggleCollapsedGroup(current, group.id),
+                    )
+                  }
+                >
                   <span className="h-px w-4 bg-border" />
                   {group.name}
-                </h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {group.links.map((link) => (
-                    <LinkCard key={link.id} link={link} />
-                  ))}
-                </div>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className={`h-3.5 w-3.5 transition-transform ${
+                      isGroupCollapsed(group.id) ? "-rotate-90" : ""
+                    }`}
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                {!isGroupCollapsed(group.id) ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {group.links.map((link) => (
+                      <LinkCard
+                        key={link.id}
+                        link={link}
+                        onActivate={(activated) =>
+                          setRecents(recordRecent(activated))
+                        }
+                        onOpenModal={setPreviewLink}
+                        listIndex={flatLinks.findIndex(
+                          (item) => item.link.id === link.id,
+                        )}
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </section>
             ),
           )}
@@ -157,7 +462,15 @@ export function PanelPage() {
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {ungrouped.map((link) => (
-                  <LinkCard key={link.id} link={link} />
+                  <LinkCard
+                    key={link.id}
+                    link={link}
+                    onActivate={(activated) => setRecents(recordRecent(activated))}
+                    onOpenModal={setPreviewLink}
+                    listIndex={flatLinks.findIndex(
+                      (item) => item.link.id === link.id,
+                    )}
+                  />
                 ))}
               </div>
             </section>
@@ -165,6 +478,13 @@ export function PanelPage() {
         </main>
         <SiteFooter />
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        links={allLinks}
+        loggedIn={Boolean(me)}
+      />
+      <LinkPreviewModal link={previewLink} onClose={() => setPreviewLink(null)} />
     </div>
   );
 }

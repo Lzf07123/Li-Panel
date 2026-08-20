@@ -7,5 +7,6 @@ def test_health(client):
 def test_security_headers(client):
     r = client.get("/api/health")
     assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+    assert "frame-src 'self' https: http:" in r.headers["content-security-policy"]
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["cache-control"] == "no-store"
