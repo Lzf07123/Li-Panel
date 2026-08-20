@@ -12,6 +12,7 @@ import { SiteFooter } from "../components/SiteFooter";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useTheme } from "../hooks/useTheme";
 import { useToast } from "../hooks/useToast";
+import { formatTags, parseTags } from "../lib/tags";
 
 type Tab = "site" | "manage" | "personal";
 
@@ -30,6 +31,7 @@ const emptyLinkForm = {
   description: "",
   is_public: false,
   guest_url_mode: "hidden" as "hidden" | "show",
+  tags: [] as string[],
 };
 
 export function SettingsPage() {
@@ -145,7 +147,7 @@ export function SettingsPage() {
       description: linkForm.description,
       is_public: linkForm.is_public,
       guest_url_mode: linkForm.guest_url_mode,
-      tags: [],
+      tags: linkForm.tags,
     };
     if (linkForm.id === null) {
       await linksApi.create(body);
@@ -508,6 +510,36 @@ export function SettingsPage() {
                       setLinkForm({ ...linkForm, description: e.target.value })
                     }
                   />
+                  <input
+                    className="input sm:col-span-2"
+                    placeholder="标签，用逗号分隔（最多 8 个）"
+                    value={formatTags(linkForm.tags)}
+                    onChange={(e) =>
+                      setLinkForm({ ...linkForm, tags: parseTags(e.target.value) })
+                    }
+                  />
+                  {linkForm.tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 sm:col-span-2">
+                      {linkForm.tags.map((tag) => (
+                        <span key={tag} className="badge badge-muted gap-1">
+                          {tag}
+                          <button
+                            type="button"
+                            aria-label={`移除标签 ${tag}`}
+                            className="text-muted transition-colors hover:text-destructive"
+                            onClick={() =>
+                              setLinkForm({
+                                ...linkForm,
+                                tags: linkForm.tags.filter((t) => t !== tag),
+                              })
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                     <input
                       type="checkbox"
@@ -596,6 +628,7 @@ export function SettingsPage() {
                                       description: link.description,
                                       is_public: link.is_public,
                                       guest_url_mode: link.guest_url_mode,
+                                      tags: link.tags,
                                     })
                                   }
                                 >

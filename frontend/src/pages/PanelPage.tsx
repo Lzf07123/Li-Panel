@@ -29,6 +29,7 @@ export function PanelPage() {
   const [me, setMe] = useState<MeOut | null>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -40,11 +41,27 @@ export function PanelPage() {
     () =>
       (panel?.groups ?? []).map((group) => ({
         ...group,
-        links: group.links.filter((link) => matches(link, query)),
+        links: group.links.filter(
+          (link) =>
+            matches(link, query) &&
+            (tagFilter === null || link.tags.includes(tagFilter)),
+        ),
       })),
-    [panel, query],
+    [panel, query, tagFilter],
   );
-  const ungrouped = (panel?.ungrouped ?? []).filter((link) => matches(link, query));
+  const ungrouped = (panel?.ungrouped ?? []).filter(
+    (link) =>
+      matches(link, query) && (tagFilter === null || link.tags.includes(tagFilter)),
+  );
+  const allTags = useMemo(() => {
+    const links = [
+      ...(panel?.groups ?? []).flatMap((group) => group.links),
+      ...(panel?.ungrouped ?? []),
+    ];
+    return Array.from(new Set(links.flatMap((link) => link.tags))).sort((a, b) =>
+      a.localeCompare(b, "zh-CN"),
+    );
+  }, [panel]);
   const flatLinks = useMemo(() => {
     const items: { link: LinkOut; id: string }[] = [];
     for (const group of groups) {
@@ -118,7 +135,7 @@ export function PanelPage() {
 
   useEffect(() => {
     setActiveIndex(-1);
-  }, [query, panel]);
+  }, [query, tagFilter, panel]);
 
   const site = panel?.site;
   const total = flatLinks.length;
@@ -213,6 +230,41 @@ export function PanelPage() {
               /
             </kbd>
           </div>
+
+          {allTags.length > 0 ? (
+            <div
+              role="group"
+              aria-label="按标签筛选"
+              className="mx-auto mb-8 flex max-w-2xl flex-wrap items-center justify-center gap-2"
+            >
+              <button
+                type="button"
+                aria-pressed={tagFilter === null}
+                className={`badge cursor-pointer border ${
+                  tagFilter === null ? "badge-primary" : "badge-muted"
+                }`}
+                onClick={() => setTagFilter(null)}
+              >
+                全部
+              </button>
+              {allTags.map((tag) => {
+                const active = tagFilter === tag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={active}
+                    className={`badge cursor-pointer border ${
+                      active ? "badge-primary" : "badge-muted"
+                    }`}
+                    onClick={() => setTagFilter(active ? null : tag)}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
 
           {query.trim() && total === 0 ? (
             <div className="card mx-auto mb-10 max-w-md p-8 text-center">
