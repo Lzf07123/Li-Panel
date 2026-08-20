@@ -332,6 +332,42 @@ export function PanelPage() {
             </div>
           ) : null}
 
+          {!query.trim() && tagFilter === null && total === 0 ? (
+            <div className="card mx-auto mb-10 max-w-md p-10 text-center">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="mx-auto h-10 w-10 text-muted"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+              </svg>
+              <p className="mt-4 text-sm font-medium text-foreground">
+                {me ? "还没有快捷方式" : "这里还没有公开内容"}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {me
+                  ? "去管理页添加你的第一个快捷方式。"
+                  : "登录后即可收藏常用入口。"}
+              </p>
+              <div className="mt-5">
+                <Link
+                  to={me ? "/settings" : "/login"}
+                  className="btn btn-primary h-9 px-4"
+                >
+                  {me ? "去添加" : "登录"}
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
           {!query.trim() && tagFilter === null && recentLinks.length > 0 ? (
             <section className="mb-8">
               <div className="mb-3 flex items-center justify-between">
