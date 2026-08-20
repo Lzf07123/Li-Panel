@@ -96,6 +96,7 @@ Li&Panel/
 - **镜像版本钉扎**：生产构建请将 `compose.yaml` 中 `image: lipanel:local` 改为固定版本（如 `lipanel:0.1.0`），避免意外覆盖；`.env.example` 已给出全部可配变量。
 - **反向代理 HTTPS**：容器默认 HTTP（`PANEL_COOKIE_SECURE=false`）。经 Nginx/Caddy 终止 TLS 时设置 `PANEL_COOKIE_SECURE=true`，并配置 `X-Forwarded-Proto`/`X-Forwarded-Host` 透传；HTTPS 部署建议开启 `PANEL_HSTS=true`。
 - **Host 白名单**：设置 `PANEL_ALLOWED_HOSTS=panel.example.com,*.example.com` 防 DNS rebinding；为空则放行。
+- **数据持久化**：全部业务数据落在 `./data`（compose bind mount，`docker compose down` 不会删除，重建镜像/容器均不受影响，只有加 `-v` 才会清空）。SQLite 为 WAL 模式，运行中会生成 `panel.db-wal`/`panel.db-shm`，直接拷贝备份时请三者一并复制，或先 `docker compose stop` 再复制。Linux 部署请确保 `./data` 属主为容器用户 uid 10001（如 `sudo chown -R 10001:10001 ./data`），否则容器内无写权限。
 - **备份恢复演练**：数据在 `./data`（挂载卷）。定期在管理页「个人设置 → 数据备份」导出 JSON 并异地保存；演练流程：导出 → 清空数据目录 → 重新初始化 → 导入备份 → 核对分组/链接数量与公开可见性。
 - **`PANEL_SECRET_KEY` 轮换**：生产要求 ≥32 字符随机串；轮换会使现有会话失效（需重新登录），建议在低峰期操作，并先备份数据。
 
