@@ -181,4 +181,5 @@
 - ✅ V49（端到端冒烟脚本）：2026-08-21 完成。`scripts/smoke.sh` 干净数据目录全流程 PASS（初始化→登录→建分组/链接→可见性→导出→导入→访客可见性）。
 - ✅ V50（性能与内存回归）：2026-08-21 完成。`scripts/check-size.sh` 构建体积 543,500B（预算 2MB）PASS；pytest 151 passed；`npm run build`（tsc -b + vite + precompress）通过；容器实测 health `{"status":"ok","version":"0.1.0"}`、`docker stats` 46.5MiB / 3 进程（≤90MB 达标）。
 - ✅ **Phase E（V41–V50）全部完成，V11–V50 全量完成**：2026-08-21，提交范围见 git log。
+- 2026-08-21 修复：备份导入/恢复按名称合并同名分组（消除「重复显示分组」）；站点连接检测改为用户侧触发（首次进入 + 回到面板时 `?refresh=1` 强制检测）。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

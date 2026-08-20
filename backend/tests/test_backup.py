@@ -35,10 +35,10 @@ def test_backup_import_appends(client, auth_headers):
     assert r.json()["imported"]["links"] == 1
     after_links = client.get("/api/links", headers=auth_headers).json()
     assert len(after_links) == before_links + 1
-    # 导入的链接正确挂到新分组
+    # 同名分组合并复用：分组数不变，链接挂到原分组
     new_groups = client.get("/api/groups", headers=auth_headers).json()
-    assert len(new_groups) == 2
-    assert after_links[-1]["group_id"] == new_groups[-1]["id"]
+    assert len(new_groups) == 1
+    assert after_links[-1]["group_id"] == new_groups[0]["id"]
 
 
 def test_backup_import_rejects_bad_url(client, auth_headers):
@@ -74,3 +74,15 @@ def test_backup_isolation(client, auth_headers):
 
 def test_backup_requires_auth(client):
     assert client.get("/api/backup").status_code == 401
+
+
+def test_backup_import_dedupes_groups(client, auth_headers):
+    _setup_data(client, auth_headers)  # 1 组 1 链接
+    backup = client.get("/api/backup", headers=auth_headers).json()
+    client.post("/api/backup", json=backup, headers=auth_headers)
+    client.post("/api/backup", json=backup, headers=auth_headers)
+    groups = client.get("/api/groups", headers=auth_headers).json()
+    assert len(groups) == 1  # 同名分组合并，不产生重复
+    links = client.get("/api/links", headers=auth_headers).json()
+    assert len(links) == 3  # 链接仍按追加语义进入
+    assert all(link["group_id"] == groups[0]["id"] for link in links)
