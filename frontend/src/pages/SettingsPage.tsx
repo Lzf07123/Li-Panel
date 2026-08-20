@@ -430,7 +430,7 @@ export function SettingsPage() {
                       <tbody>
                         {groups.map((group) => (
                           <tr key={group.id}>
-                            <td className="font-medium">{group.name}</td>
+                            <td className="min-w-36 font-medium">{group.name}</td>
                             <td>
                               <span
                                 className={`badge ${
@@ -440,7 +440,7 @@ export function SettingsPage() {
                                 {group.is_public ? "公开" : "私密"}
                               </span>
                             </td>
-                            <td>
+                            <td className="whitespace-nowrap">
                               <div className="flex gap-2">
                                 <button
                                   type="button"
@@ -614,7 +614,7 @@ export function SettingsPage() {
                       <tbody>
                         {links.map((link) => (
                           <tr key={link.id}>
-                            <td className="font-medium">{link.name}</td>
+                            <td className="min-w-44 font-medium">{link.name}</td>
                             <td className="table-cell-clip max-w-56 font-mono text-xs text-muted">
                               {link.url_lan}
                             </td>
@@ -627,7 +627,7 @@ export function SettingsPage() {
                                 {link.is_public ? "公开" : "私密"}
                               </span>
                             </td>
-                            <td>
+                            <td className="whitespace-nowrap">
                               <div className="flex gap-2">
                                 <button
                                   type="button"
