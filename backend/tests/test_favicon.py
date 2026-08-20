@@ -134,3 +134,76 @@ def test_fetch_icon_foreign_404(client, auth_headers, icon_server):
 def test_favicon_route_missing_file_404(client):
     assert client.get("/favicons/does-not-exist.png").status_code == 404
     assert client.get("/favicons/..%2fsecret").status_code == 404
+
+
+def test_auto_fetch_icon_on_create(client, auth_headers, icon_server):
+    import time
+
+    r = client.post(
+        "/api/links",
+        json={"name": "站点", "url_lan": icon_server},
+        headers=auth_headers,
+    )
+    assert r.status_code == 201
+    lid = r.json()["id"]
+    icon = None
+    for _ in range(30):
+        links = client.get("/api/links", headers=auth_headers).json()
+        link = next(l for l in links if l["id"] == lid)
+        if link["icon_type"] == "upload":
+            icon = link["icon_value"]
+            break
+        time.sleep(0.1)
+    assert icon is not None and icon.startswith("/favicons/link-")
+    assert client.get(icon).status_code == 200
+
+
+def test_auto_fetch_skips_custom_icon(client, auth_headers, icon_server):
+    import time
+
+    r = client.post(
+        "/api/links",
+        json={
+            "name": "站点",
+            "url_lan": icon_server,
+            "icon_type": "iconify",
+            "icon_value": "mdi:test",
+        },
+        headers=auth_headers,
+    )
+    lid = r.json()["id"]
+    time.sleep(0.5)
+    links = client.get("/api/links", headers=auth_headers).json()
+    link = next(l for l in links if l["id"] == lid)
+    assert link["icon_type"] == "iconify"  # 不覆盖自定义图标
+
+
+def test_auto_fetch_disabled(client, auth_headers, icon_server, tmp_path):
+    import time
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    app = create_app(
+        load_settings(
+            overrides={
+                "data_dir": str(tmp_path),
+                "secret_key": "x",
+                "link_icon_fetch": False,
+            }
+        )
+    )
+    c = TestClient(app)
+    c.post("/api/setup", json={"username": "admin", "password": "secret123"})
+    login = c.post("/api/auth/login", json={"username": "admin", "password": "secret123"})
+    headers = {"Cookie": f"lipanel_session={login.cookies['lipanel_session']}"}
+    lid = c.post(
+        "/api/links",
+        json={"name": "站点", "url_lan": icon_server},
+        headers=headers,
+    ).json()["id"]
+    time.sleep(0.5)
+    links = c.get("/api/links", headers=headers).json()
+    link = next(l for l in links if l["id"] == lid)
+    assert link["icon_type"] == "letter"  # 开关关闭时不自动抓取

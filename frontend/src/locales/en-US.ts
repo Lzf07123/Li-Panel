@@ -185,6 +185,8 @@ export const enUS: Record<string, string> = {
   "「{name}」已{status}": "\"{name}\" is now {status}",
   "「{name}」图标已更新": "Icon for \"{name}\" updated",
   "图标已抓取": "Icon fetched",
+  "补抓缺失图标": "Fetch missing icons",
+  "已获取 {n}/{total} 个图标": "Fetched {n}/{total} icons",
   "快捷方式已保存": "Shortcut saved",
   "已删除 {n} 个快捷方式": "Deleted {n} shortcuts",
   "已移动所选快捷方式": "Moved selected shortcuts",

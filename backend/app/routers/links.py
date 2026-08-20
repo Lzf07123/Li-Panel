@@ -6,7 +6,7 @@ import sqlite3
 from typing import Literal
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from app.db import get_db
@@ -223,9 +223,52 @@ def _check_duplicate(
             )
 
 
+def _auto_fetch_icon(request: Request, link_id: int, url: str) -> None:
+    """后台自动获取站点 favicon：失败静默，不影响创建/编辑响应。"""
+    settings = request.app.state.settings
+    try:
+        from app.db import connect
+
+        data = fetch_favicon(url)
+        if data is None:
+            set_cached(link_id, None)
+            return
+        name = f"link-{link_id}-{secrets.token_hex(4)}.png"
+        favicons_dir = settings.data_dir / "favicons"
+        favicons_dir.mkdir(parents=True, exist_ok=True)
+        (favicons_dir / name).write_bytes(data)
+        path = f"/favicons/{name}"
+        set_cached(link_id, path)
+        conn = connect(settings.db_path)
+        conn.execute(
+            "UPDATE links SET icon_type = 'upload', icon_value = ? "
+            "WHERE id = ? AND icon_type = 'letter'",
+            (path, link_id),
+        )
+        conn.close()
+    except Exception:
+        pass
+
+
+def _maybe_schedule_icon_fetch(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    link_id: int,
+    body: LinkIn,
+) -> None:
+    """新建/编辑未使用自定义图标且开关开启时，自动后台抓取 favicon。"""
+    settings = request.app.state.settings
+    if not settings.link_icon_fetch or body.icon_type != "letter":
+        return
+    url = body.url_wan or body.url_lan
+    background_tasks.add_task(_auto_fetch_icon, request, link_id, url)
+
+
 @router.post("", status_code=201)
 def create_link(
     body: LinkIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
@@ -257,13 +300,17 @@ def create_link(
             body.health_threshold,
         ),
     )
-    return _link_dict(_owned_link(conn, cur.lastrowid, user["id"]))
+    link_id = int(cur.lastrowid)
+    _maybe_schedule_icon_fetch(request, background_tasks, link_id, body)
+    return _link_dict(_owned_link(conn, link_id, user["id"]))
 
 
 @router.put("/{lid}")
 def update_link(
     lid: int,
     body: LinkIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
@@ -296,6 +343,7 @@ def update_link(
             lid,
         ),
     )
+    _maybe_schedule_icon_fetch(request, background_tasks, lid, body)
     return _link_dict(_owned_link(conn, lid, user["id"]))
 
 
