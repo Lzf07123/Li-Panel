@@ -28,12 +28,35 @@ export function PanelPage() {
   const [panel, setPanel] = useState<PanelOut | null>(null);
   const [me, setMe] = useState<MeOut | null>(null);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     authApi.meSilent().then(setMe).catch(() => setMe(null));
     panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, []);
+
+  const groups = useMemo(
+    () =>
+      (panel?.groups ?? []).map((group) => ({
+        ...group,
+        links: group.links.filter((link) => matches(link, query)),
+      })),
+    [panel, query],
+  );
+  const ungrouped = (panel?.ungrouped ?? []).filter((link) => matches(link, query));
+  const flatLinks = useMemo(() => {
+    const items: { link: LinkOut; id: string }[] = [];
+    for (const group of groups) {
+      for (const link of group.links) {
+        items.push({ link, id: `panel-link-${items.length}` });
+      }
+    }
+    for (const link of ungrouped) {
+      items.push({ link, id: `panel-link-${items.length}` });
+    }
+    return items;
+  }, [groups, ungrouped]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -62,21 +85,41 @@ export function PanelPage() {
         } else {
           searchRef.current?.blur();
         }
+        return;
+      }
+      if (document.activeElement !== searchRef.current || flatLinks.length === 0) {
+        return;
+      }
+      const moveTo = (next: number) => {
+        event.preventDefault();
+        const clamped =
+          next < 0 ? flatLinks.length - 1 : next >= flatLinks.length ? 0 : next;
+        setActiveIndex(clamped);
+        const el = document.getElementById(flatLinks[clamped].id);
+        el?.focus();
+        el?.scrollIntoView({ block: "nearest" });
+      };
+      if (event.key === "ArrowDown") {
+        moveTo(activeIndex + 1);
+      } else if (event.key === "ArrowUp") {
+        moveTo(activeIndex - 1);
+      } else if (event.key === "Home") {
+        moveTo(0);
+      } else if (event.key === "End") {
+        moveTo(flatLinks.length - 1);
+      } else if (event.key === "Enter" && activeIndex >= 0) {
+        event.preventDefault();
+        document.getElementById(flatLinks[activeIndex].id)?.click();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [query]);
+  }, [query, flatLinks, activeIndex]);
 
-  const groups = useMemo(
-    () =>
-      (panel?.groups ?? []).map((group) => ({
-        ...group,
-        links: group.links.filter((link) => matches(link, query)),
-      })),
-    [panel, query],
-  );
-  const ungrouped = (panel?.ungrouped ?? []).filter((link) => matches(link, query));
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [query, panel]);
+
   const site = panel?.site;
   const total =
     (panel?.groups.reduce((sum, group) => sum + group.links.length, 0) ?? 0) +
@@ -182,7 +225,13 @@ export function PanelPage() {
                 </h2>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {group.links.map((link) => (
-                    <LinkCard key={link.id} link={link} />
+                    <LinkCard
+                      key={link.id}
+                      link={link}
+                      listIndex={flatLinks.findIndex(
+                        (item) => item.link.id === link.id,
+                      )}
+                    />
                   ))}
                 </div>
               </section>
@@ -197,7 +246,13 @@ export function PanelPage() {
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {ungrouped.map((link) => (
-                  <LinkCard key={link.id} link={link} />
+                  <LinkCard
+                    key={link.id}
+                    link={link}
+                    listIndex={flatLinks.findIndex(
+                      (item) => item.link.id === link.id,
+                    )}
+                  />
                 ))}
               </div>
             </section>

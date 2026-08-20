@@ -1,7 +1,13 @@
 import type { LinkOut } from "../api/types";
 import { ACCENT_CLASSES, accentFor } from "../lib/accent";
 
-export function LinkCard({ link }: { link: LinkOut }) {
+export function LinkCard({
+  link,
+  listIndex,
+}: {
+  link: LinkOut;
+  listIndex?: number;
+}) {
   const href = link.url ? link.url : `/go/${link.id}`;
   const target = link.open_mode === "new_tab" ? "_blank" : undefined;
   const accent = ACCENT_CLASSES[accentFor(link.name)];
@@ -9,6 +15,7 @@ export function LinkCard({ link }: { link: LinkOut }) {
 
   return (
     <a
+      id={listIndex === undefined ? undefined : `panel-link-${listIndex}`}
       href={href}
       target={target}
       rel={target ? "noreferrer" : undefined}
