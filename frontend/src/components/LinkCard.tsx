@@ -1,6 +1,7 @@
 import type { LinkOut } from "../api/types";
 import { ACCENT_CLASSES, accentFor } from "../lib/accent";
 import { recordRecent } from "../lib/recent";
+import { useI18n } from "../lib/i18n";
 
 export function LinkCard({
   link,
@@ -34,6 +35,7 @@ export function LinkCard({
   const href = link.url ? link.url : `/go/${link.id}`;
   const isModal = link.open_mode === "modal";
   const target = link.open_mode === "new_tab" ? "_blank" : undefined;
+  const { t } = useI18n();
   const accent = ACCENT_CLASSES[accentFor(link.name)];
   const letter = link.name.trim().charAt(0).toUpperCase() || "?";
 
@@ -114,17 +116,17 @@ export function LinkCard({
           tabIndex={-1}
           aria-label={
             status === "up"
-              ? "在线"
+              ? t("在线")
               : status === "down"
-                ? "离线"
-                : "状态未知"
+                ? t("离线")
+                : t("状态未知")
           }
           title={
             status === "up"
-              ? `在线${statusMs != null ? ` · ${statusMs}ms` : ""}（点击查看趋势）`
+              ? t("在线 · {ms}ms", { ms: statusMs ?? "" }) + t("（点击查看趋势）")
               : status === "down"
-                ? "离线（点击查看趋势）"
-                : "状态未知"
+                ? t("离线") + t("（点击查看趋势）")
+                : t("状态未知")
           }
           onClick={(event) => {
             event.preventDefault();

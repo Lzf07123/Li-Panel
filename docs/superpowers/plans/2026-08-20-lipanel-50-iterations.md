@@ -172,5 +172,7 @@
 - ✅ Phase D（V31–V40）全部完成：2026-08-21，提交范围 `c6a38ef`（V31）→ `9278c54`（V40）。
 - ✅ V41（PWA 清单与图标）：2026-08-21 完成。`public/manifest.json`（name/start_url/standalone/主题色/512 maskable+any）、`application-name`、apple-touch-icon；构建产物含 manifest。
 - ✅ V42（离线缓存外壳）：2026-08-21 完成。`public/sw.js`（/assets 缓存优先、导航网络优先失败回退首页、API/auth 不缓存、版本化清理）+ 生产构建注册。构建产物含 sw.js。
-- ⬜ V43–V50：待执行。
+- ✅ V43（i18n 框架）：2026-08-21 完成。`src/lib/i18n.ts`（中文原文即 key、en-US 字典、`{param}` 插值、`useI18n`）+ `src/locales/en-US.ts`；面板/设置/登录/命令面板/状态趋势等主要页面文案迁移（品牌与配置项文案保留原文，作为配置驱动字段豁免）。
+- ✅ V44（语言偏好）：2026-08-21 完成。个人设置页语言选择（中文/English），localStorage + 后端用户设置 `lang` 双持久化，`document.documentElement.lang` 同步；浏览器偏好回退。pytest 149 passed；Playwright 端到端：切 English 后面板显示 Welcome/Manage/Sign out。
+- ⬜ V45–V50：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

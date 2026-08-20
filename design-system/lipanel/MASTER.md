@@ -102,6 +102,7 @@
 - V40 密钥与上传加固：`PANEL_HOST_COOKIE`（`__Host-` 前缀，cookie 名全链路变量化）；上传魔数校验；生产 secret ≥32 启动校验；pytest 148 passed
 - V41 PWA 清单：`manifest.json`（standalone、主题色、512 maskable/any）、application-name、apple-touch-icon；构建产物含清单
 - V42 离线缓存外壳：`public/sw.js`（静态缓存优先、导航网络优先+离线回退、API 不缓存、版本化缓存清理）；生产注册；构建产物含 sw.js
+- V43/V44 i18n 与语言偏好：`lib/i18n.ts` + `locales/en-US.ts`（中文原文即 key、插值、useI18n）；主要页面迁移；语言选择双持久化（localStorage + 后端 `lang`）；pytest 149 passed，Playwright 英文界面通过
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

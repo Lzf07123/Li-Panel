@@ -87,6 +87,7 @@ def site_settings_put(
 class UserSettingsIn(BaseModel):
     theme: str | None = None
     link_mode: str | None = None
+    lang: str | None = None
     rss_feeds: list[str] | None = None
 
 
@@ -113,6 +114,8 @@ def user_settings_put(
             raise HTTPException(status_code=422, detail="theme 取值非法")
         if key == "link_mode" and value not in LINK_MODE_VALUES:
             raise HTTPException(status_code=422, detail="link_mode 取值非法")
+        if key == "lang" and value not in {"zh-CN", "en-US"}:
+            raise HTTPException(status_code=422, detail="lang 取值非法")
         if key == "rss_feeds":
             if not isinstance(value, list):
                 raise HTTPException(status_code=422, detail="rss_feeds 必须是数组")

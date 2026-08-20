@@ -21,6 +21,7 @@ import { BlurText } from "../components/bits/BlurText";
 import { FloatingBackground } from "../components/FloatingBackground";
 import { TechAmbience } from "../components/bits/TechAmbience";
 import { useToast } from "../hooks/useToast";
+import { useI18n } from "../lib/i18n";
 
 function matches(link: LinkOut, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -64,6 +65,7 @@ export function PanelPage() {
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const toast = useToast();
+  const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -278,7 +280,7 @@ export function PanelPage() {
     const from = ids.indexOf(sourceId);
     const to = ids.indexOf(target.id);
     if (from === -1 || to === -1) {
-      toast.info("拖拽排序仅在同一个分组内生效");
+      toast.info(t("拖拽排序仅在同一个分组内生效"));
       return;
     }
     const next = [...ids];
@@ -304,7 +306,7 @@ export function PanelPage() {
       return { ...current, ungrouped: links };
     });
     linksApi.updateOrder(next).catch(() => {
-      toast.error("排序保存失败，已恢复原顺序");
+      toast.error(t("排序保存失败，已恢复原顺序"));
       void panelApi.get().then(setPanel).catch(() => undefined);
     });
   }
@@ -325,24 +327,24 @@ export function PanelPage() {
       <TechAmbience />
       <div className="relative z-10 flex flex-1 flex-col">
         <AppHeader
-          title={me ? `欢迎，${me.user.username}` : "快捷方式"}
+          title={me ? t("欢迎，{name}", { name: me.user.username }) : t("快捷方式")}
           actions={
             me ? (
               <>
                 <Link to="/settings" className="btn btn-ghost h-9 px-3">
-                  管理
+                  {t("管理")}
                 </Link>
                 <button
                   type="button"
                   className="btn btn-ghost h-9 px-3"
                   onClick={logout}
                 >
-                  退出
+                  {t("退出")}
                 </button>
               </>
             ) : (
               <Link to="/login" className="btn btn-primary h-9 px-4">
-                登录
+                {t("登录")}
               </Link>
             )
           }
@@ -372,13 +374,13 @@ export function PanelPage() {
               ) : null}
               <span className="badge badge-muted mt-1" aria-live="polite">
                 {query.trim()
-                  ? `找到 ${total} 个结果`
-                  : `共 ${total} 个快捷方式`}
+                  ? t("找到 {n} 个结果", { n: total })
+                  : t("共 {n} 个快捷方式", { n: total })}
               </span>
               {me && !query.trim() && todayLinks.length > 0 ? (
                 <div
                   className="mt-2 flex max-w-2xl flex-wrap items-center justify-center gap-2"
-                  aria-label="今天常用"
+                  aria-label={t("今天常用")}
                 >
                   {todayLinks.map((link) => {
                     const href = link.url ? link.url : `/go/${link.id}`;
@@ -427,7 +429,7 @@ export function PanelPage() {
               ref={searchRef}
               type="search"
               className="input pl-9"
-              placeholder="搜索名称、描述、标签…"
+              placeholder={t("搜索名称、描述、标签…")}
               aria-label="搜索快捷方式"
               title="按 / 聚焦；Ctrl/⌘ + K 打开命令面板"
               value={query}
@@ -452,7 +454,7 @@ export function PanelPage() {
                 }`}
                 onClick={() => setTagFilter(null)}
               >
-                全部
+                {t("全部")}
               </button>
               {allTags.map((tag) => {
                 const active = tagFilter === tag;
@@ -476,9 +478,11 @@ export function PanelPage() {
           {query.trim() && total === 0 ? (
             <div className="card mx-auto mb-10 max-w-md p-8 text-center">
               <p className="text-sm font-medium text-foreground">
-                没有找到匹配的快捷方式
+                {t("没有找到匹配的快捷方式")}
               </p>
-              <p className="mt-1 text-xs text-muted">用外部搜索引擎继续：</p>
+              <p className="mt-1 text-xs text-muted">
+                {t("用外部搜索引擎继续：")}
+              </p>
               <div className="mt-4 flex justify-center gap-2">
                 <a
                   className="btn btn-ghost h-9 px-4"
@@ -486,7 +490,7 @@ export function PanelPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Bing 搜索
+                  {t("Bing 搜索")}
                 </a>
                 <a
                   className="btn btn-ghost h-9 px-4"
@@ -494,7 +498,7 @@ export function PanelPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Google 搜索
+                  {t("Google 搜索")}
                 </a>
               </div>
             </div>
@@ -518,19 +522,19 @@ export function PanelPage() {
                 <rect x="14" y="14" width="7" height="7" rx="1.5" />
               </svg>
               <p className="mt-4 text-sm font-medium text-foreground">
-                {me ? "还没有快捷方式" : "这里还没有公开内容"}
+                {me ? t("还没有快捷方式") : t("这里还没有公开内容")}
               </p>
               <p className="mt-1 text-xs text-muted">
                 {me
-                  ? "去管理页添加你的第一个快捷方式。"
-                  : "登录后即可收藏常用入口。"}
+                  ? t("去管理页添加你的第一个快捷方式。")
+                  : t("登录后即可收藏常用入口。")}
               </p>
               <div className="mt-5">
                 <Link
                   to={me ? "/settings" : "/login"}
                   className="btn btn-primary h-9 px-4"
                 >
-                  {me ? "去添加" : "登录"}
+                  {me ? t("去添加") : t("登录")}
                 </Link>
               </div>
             </div>
@@ -541,7 +545,7 @@ export function PanelPage() {
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-muted">
                   <span className="h-px w-4 bg-border" />
-                  最近使用
+                  {t("最近使用")}
                   <span className="text-xs font-normal text-muted/80">
                     · {recentLinks.length}
                   </span>
@@ -554,7 +558,7 @@ export function PanelPage() {
                     setRecents([]);
                   }}
                 >
-                  清空
+                  {t("清空")}
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -647,7 +651,7 @@ export function PanelPage() {
             <section className="mb-8">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
                 <span className="h-px w-4 bg-border" />
-                未分组
+                {t("未分组")}
                 <span className="text-xs font-normal text-muted/80">
                   · {ungrouped.length}
                 </span>
@@ -685,7 +689,7 @@ export function PanelPage() {
                 onClick={() => setRssOpen((current) => !current)}
               >
                 <span className="h-px w-4 bg-border" />
-                订阅
+                {t("订阅")}
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"

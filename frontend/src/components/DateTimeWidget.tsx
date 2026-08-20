@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useI18n } from "../lib/i18n";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -33,6 +34,7 @@ export function DateTimeWidget({
   username?: string | null;
 }) {
   const [now, setNow] = useState(() => new Date());
+  const { t } = useI18n();
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);

@@ -12,6 +12,7 @@ import { ScrollTabs } from "../components/ScrollTabs";
 import { SiteFooter } from "../components/SiteFooter";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useTheme } from "../hooks/useTheme";
+import { useI18n, type Lang } from "../lib/i18n";
 import { useToast } from "../hooks/useToast";
 import { GROUP_ICON_NAMES, GroupIcon, isGroupIconName } from "../components/GroupIcon";
 import type { GroupIconName } from "../components/GroupIcon";
@@ -92,6 +93,12 @@ export function SettingsPage() {
   >([]);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
+  const { t, lang, setLang } = useI18n();
+  const handleLangChange = (next: Lang) => {
+    setLang(next);
+    document.documentElement.lang = next;
+    void settingsApi.updateUser({ lang: next }).catch(() => undefined);
+  };
   const isAdmin = me?.user.role === "admin";
   const visibleTabs = TABS.filter((item) => item.key !== "site" || isAdmin);
 
@@ -133,6 +140,10 @@ export function SettingsPage() {
         .user()
         .then((settings) => {
           if (settings.link_mode) setLinkMode(settings.link_mode);
+          if (settings.lang === "zh-CN" || settings.lang === "en-US") {
+            setLang(settings.lang as Lang);
+            document.documentElement.lang = settings.lang;
+          }
           try {
             const feeds = JSON.parse(settings.rss_feeds ?? "[]") as unknown;
             if (Array.isArray(feeds)) {
@@ -159,7 +170,7 @@ export function SettingsPage() {
     async (patch: Parameters<typeof settingsApi.updateSite>[0]) => {
       const next = await settingsApi.updateSite(patch);
       setSite(next);
-      toast.success("站点信息已保存");
+      toast.success(t("站点信息已保存"));
     },
     {
       onError: (err) =>
@@ -171,7 +182,7 @@ export function SettingsPage() {
     async ({ field, file }: { field: "logo" | "favicon"; file: File }) => {
       const { url } = await settingsApi.upload(file);
       setSite((current) => (current ? { ...current, [field]: url } : current));
-      toast.success("图片已上传，记得保存");
+      toast.success(t("图片已上传，记得保存"));
     },
     {
       onError: (err) =>
@@ -189,7 +200,7 @@ export function SettingsPage() {
     setNewGroupPublic(false);
     setNewGroupIcon("folder");
     setGroups(await groupsApi.list());
-    toast.success("分组已创建");
+    toast.success(t("分组已创建"));
   });
 
   const toggleGroupAction = useAsyncAction(
@@ -200,7 +211,7 @@ export function SettingsPage() {
         is_public: !group.is_public,
       });
       setGroups(await groupsApi.list());
-      toast.success(`「${group.name}」已${group.is_public ? "私密" : "公开"}`);
+      toast.success(t("「{name}」已{status}", { name: group.name, status: group.is_public ? t("私密") : t("公开") }));
     },
     { onError: (err) => setError(err.message) },
   );
@@ -213,7 +224,7 @@ export function SettingsPage() {
         is_public: group.is_public,
       });
       setGroups(await groupsApi.list());
-      toast.success(`「${group.name}」图标已更新`);
+      toast.success(t("「{name}」图标已更新", { name: group.name }));
     },
     { onError: (err) => setError(err.message) },
   );
@@ -222,7 +233,7 @@ export function SettingsPage() {
     async (link: LinkOut) => {
       await linksApi.fetchIcon(link.id);
       setLinks(await linksApi.list());
-      toast.success(`「${link.name}」图标已抓取`);
+      toast.success(t("「{name}」图标已抓取", { name: link.name }));
     },
     { onError: (err) => setError(err.message) },
   );
@@ -230,13 +241,13 @@ export function SettingsPage() {
   const revokeSessionAction = useAsyncAction(async (id: number) => {
     await sessionsApi.revoke(id);
     setSessions(await sessionsApi.list());
-    toast.success("会话已吊销");
+    toast.success(t("会话已吊销"));
   }, { onError: (err) => setError(err.message) });
 
   const revokeAllSessionsAction = useAsyncAction(async () => {
     const result = await sessionsApi.revokeAll();
     setSessions(await sessionsApi.list());
-    toast.success(`已吊销 ${result.revoked} 个其他会话`);
+    toast.success(t("已吊销 {n} 个其他会话", { n: result.revoked }));
   }, { onError: (err) => setError(err.message) });
 
   const unbindSsoAction = useAsyncAction(async () => {
@@ -244,7 +255,7 @@ export function SettingsPage() {
     setUnbindOpen(false);
     setUnbindPassword("");
     setMe(await authApi.me());
-    toast.success("SSO 已解绑");
+    toast.success(t("SSO 已解绑"));
   }, { onError: (err) => setError(err.message) });
 
   const saveRssAction = useAsyncAction(async () => {
@@ -252,7 +263,7 @@ export function SettingsPage() {
       .map((url) => url.trim())
       .filter((url) => url !== "");
     await rssApi.setFeeds(urls);
-    toast.success(urls.length > 0 ? "订阅已保存" : "订阅已清空");
+    toast.success(urls.length > 0 ? t("订阅已保存") : t("订阅已清空"));
   }, { onError: (err) => setError(err.message) });
 
   const restoreSnapshotAction = useAsyncAction(async () => {
@@ -280,7 +291,7 @@ export function SettingsPage() {
     anchor.download = `lipanel-backup-${date}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    toast.success("备份已导出");
+    toast.success(t("备份已导出"));
   }, { onError: (err) => setError(err.message) });
 
   const importBackupAction = useAsyncAction(
@@ -305,7 +316,7 @@ export function SettingsPage() {
       setEditingTag(null);
       setRenameValue("");
       setLinks(await linksApi.list().catch(() => links));
-      toast.success(`标签「${oldName}」已重命名为「${newName}」`);
+      toast.success(t("标签「{old}」已重命名为「{new}」", { old: oldName, new: newName }));
     },
     { onError: (err) => setError(err.message) },
   );
@@ -316,7 +327,7 @@ export function SettingsPage() {
     setTags(await tagsApi.list());
     setLinks(await linksApi.list().catch(() => links));
     setDeleteTagName(null);
-    toast.success(`标签「${deleteTagName}」已删除`);
+    toast.success(t("标签「{name}」已删除", { name: deleteTagName }));
   }, { onError: (err) => setError(err.message) });
 
   const batchDeleteAction = useAsyncAction(async () => {
@@ -325,7 +336,7 @@ export function SettingsPage() {
     setSelectedIds(new Set());
     setBatchDeleteOpen(false);
     setLinks(await linksApi.list());
-    toast.success(`已删除 ${count} 个快捷方式`);
+    toast.success(t("已删除 {n} 个快捷方式", { n: count }));
   }, { onError: (err) => setError(err.message) });
 
   const batchMoveAction = useAsyncAction(async () => {
@@ -333,7 +344,7 @@ export function SettingsPage() {
     await linksApi.batchMove([...selectedIds], groupId);
     setSelectedIds(new Set());
     setLinks(await linksApi.list());
-    toast.success("已移动所选快捷方式");
+    toast.success(t("已移动所选快捷方式"));
   }, { onError: (err) => setError(err.message) });
 
   const batchVisibilityAction = useAsyncAction(
@@ -341,7 +352,7 @@ export function SettingsPage() {
       await linksApi.batchVisibility([...selectedIds], is_public);
       setSelectedIds(new Set());
       setLinks(await linksApi.list());
-      toast.success(is_public ? "已设为公开" : "已设为私密");
+      toast.success(is_public ? t("已设为公开") : t("已设为私密"));
     },
     { onError: (err) => setError(err.message) },
   );
@@ -350,7 +361,7 @@ export function SettingsPage() {
     async (id: number) => {
       await groupsApi.remove(id);
       setGroups(await groupsApi.list());
-      toast.success("分组已删除，链接保留为未分组");
+      toast.success(t("分组已删除，链接保留为未分组"));
       setDeleteGroupId(null);
     },
     { onError: (err) => setError(err.message) },
@@ -381,7 +392,7 @@ export function SettingsPage() {
     setLinkForm(emptyLinkForm);
     setDuplicateNotice(null);
     setLinks(await linksApi.list());
-    toast.success("快捷方式已保存");
+    toast.success(t("快捷方式已保存"));
   }, {
     onError: (err) => {
       const e = err as Error & { code?: string };
@@ -456,13 +467,13 @@ export function SettingsPage() {
     });
   }
 
-  if (!me) return <PageSkeleton title="管理" />;
+  if (!me) return <PageSkeleton title={t("管理")} />;
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       <div className="relative z-10 flex flex-1 flex-col">
         <AppHeader
-          title="管理"
+          title={t("管理")}
           actions={
             <button
               type="button"
@@ -493,7 +504,7 @@ export function SettingsPage() {
                 }`}
                 onClick={() => setTab(item.key)}
               >
-                {item.label}
+                {t(item.label)}
               </button>
             ))}
           </ScrollTabs>
@@ -525,7 +536,7 @@ export function SettingsPage() {
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
-                    <span className="label">站点名称</span>
+                    <span className="label">{t("站点名称")}</span>
                     <input
                       className="input"
                       value={site.site_name}
@@ -535,7 +546,7 @@ export function SettingsPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="label">slogan</span>
+                    <span className="label">{t("slogan")}</span>
                     <input
                       className="input"
                       value={site.slogan}
@@ -544,7 +555,7 @@ export function SettingsPage() {
                   </label>
                 </div>
                 <label className="block">
-                  <span className="label">描述</span>
+                  <span className="label">{t("描述")}</span>
                   <textarea
                     className="input"
                     rows={2}
@@ -556,7 +567,7 @@ export function SettingsPage() {
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <span className="label">Logo</span>
+                    <span className="label">{t("Logo")}</span>
                     <div className="flex flex-wrap items-center gap-2">
                       <img
                         src={site.logo}
@@ -575,7 +586,7 @@ export function SettingsPage() {
                     </div>
                   </div>
                   <div>
-                    <span className="label">favicon</span>
+                    <span className="label">{t("favicon")}</span>
                     <div className="flex flex-wrap items-center gap-2">
                       <img
                         src={site.favicon}
@@ -607,7 +618,7 @@ export function SettingsPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="label">备案号</span>
+                    <span className="label">{t("备案号")}</span>
                     <input
                       className="input"
                       value={site.icp}
@@ -616,12 +627,12 @@ export function SettingsPage() {
                   </label>
                 </div>
                 <div className="rounded-xl bg-surface-2/60 p-4">
-                  <p className="text-sm font-medium text-foreground">通知设置</p>
+                  <p className="text-sm font-medium text-foreground">{t("通知设置")}</p>
                   <p className="mt-1 text-xs text-muted">
                     链接状态变化时向 ntfy / Webhook 地址发送 JSON 通知。
                   </p>
                   <label className="mt-3 block">
-                    <span className="label">通知地址（ntfy / Webhook）</span>
+                    <span className="label">{t("通知地址（ntfy / Webhook）")}</span>
                     <input
                       className="input"
                       value={site.notify_url}
@@ -643,7 +654,7 @@ export function SettingsPage() {
                         })
                       }
                     />
-                    启用状态变化通知
+                    {t("启用状态变化通知")}
                   </label>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
@@ -658,14 +669,14 @@ export function SettingsPage() {
                       })
                     }
                   />
-                  允许访客查看公开内容
+                  {t("允许访客查看公开内容")}
                 </label>
                 <AsyncButton
                   type="submit"
                   status={saveSiteAction.status}
                   className="btn btn-primary"
                 >
-                  保存站点信息
+                  {t("保存站点信息")}
                 </AsyncButton>
               </form>
             ) : null}
@@ -680,12 +691,12 @@ export function SettingsPage() {
                   className="card flex flex-wrap items-end gap-3 p-6"
                 >
                   <div className="min-w-48 flex-1">
-                    <span className="label">新建分组</span>
+                    <span className="label">{t("新建分组")}</span>
                     <input
                       className="input"
                       value={newGroupName}
                       onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder="分组名称"
+                      placeholder={t("分组名称")}
                       required
                     />
                   </div>
@@ -712,27 +723,27 @@ export function SettingsPage() {
                       checked={newGroupPublic}
                       onChange={(e) => setNewGroupPublic(e.target.checked)}
                     />
-                    公开
+                    {t("公开")}
                   </label>
                   <AsyncButton
                     type="submit"
                     status={addGroupAction.status}
                     className="btn btn-primary"
                   >
-                    创建
+                    {t("创建")}
                   </AsyncButton>
                 </form>
 
                 <div className="card p-6">
-                  <h2 className="mb-3 text-sm font-semibold text-foreground">分组</h2>
+                  <h2 className="mb-3 text-sm font-semibold text-foreground">{t("分组")}</h2>
                   <div className="table-shell overflow-x-auto">
                     <table>
                       <thead>
                         <tr>
-                          <th>名称</th>
-                          <th>图标</th>
-                          <th>访客可见</th>
-                          <th>操作</th>
+                          <th>{t("名称")}</th>
+                          <th>{t("图标")}</th>
+                          <th>{t("访客可见")}</th>
+                          <th>{t("操作")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -789,7 +800,7 @@ export function SettingsPage() {
                                   group.is_public ? "badge-primary" : "badge-muted"
                                 }`}
                               >
-                                {group.is_public ? "公开" : "私密"}
+                                {group.is_public ? t("公开") : t("私密")}
                               </span>
                             </td>
                             <td className="whitespace-nowrap">
@@ -799,14 +810,14 @@ export function SettingsPage() {
                                   className="btn btn-ghost h-8 px-3 text-xs"
                                   onClick={() => void toggleGroupAction.run(group)}
                                 >
-                                  切换可见性
+                                  {t("切换可见性")}
                                 </button>
                                 <button
                                   type="button"
                                   className="btn btn-danger h-8 px-3 text-xs"
                                   onClick={() => setDeleteGroupId(group.id)}
                                 >
-                                  删除
+                                  {t("删除")}
                                 </button>
                               </div>
                             </td>
@@ -825,18 +836,18 @@ export function SettingsPage() {
                   className="card grid gap-3 p-6 sm:grid-cols-2"
                 >
                   <h2 className="text-sm font-semibold text-foreground sm:col-span-2">
-                    {linkForm.id === null ? "新建快捷方式" : `编辑：${linkForm.name}`}
+                    {linkForm.id === null ? t("新建快捷方式") : t("编辑：{name}", { name: linkForm.name })}
                   </h2>
                   <input
                     className="input"
-                    placeholder="名称"
+                    placeholder={t("名称")}
                     value={linkForm.name}
                     onChange={(e) => setLinkForm({ ...linkForm, name: e.target.value })}
                     required
                   />
                   <input
                     className="input"
-                    placeholder="内网地址 http://…"
+                    placeholder={t("内网地址 http://…")}
                     value={linkForm.url_lan}
                     onChange={(e) =>
                       setLinkForm({ ...linkForm, url_lan: e.target.value })
@@ -845,7 +856,7 @@ export function SettingsPage() {
                   />
                   <input
                     className="input"
-                    placeholder="公网地址（可选）"
+                    placeholder={t("公网地址（可选）")}
                     value={linkForm.url_wan}
                     onChange={(e) =>
                       setLinkForm({ ...linkForm, url_wan: e.target.value })
@@ -858,7 +869,7 @@ export function SettingsPage() {
                       setLinkForm({ ...linkForm, group_id: e.target.value })
                     }
                   >
-                    <option value="">未分组</option>
+                    <option value="">{t("未分组")}</option>
                     {groups.map((group) => (
                       <option key={group.id} value={group.id}>
                         {group.name}
@@ -867,7 +878,7 @@ export function SettingsPage() {
                   </select>
                   <input
                     className="input sm:col-span-2"
-                    placeholder="描述（可选）"
+                    placeholder={t("描述（可选）")}
                     value={linkForm.description}
                     onChange={(e) =>
                       setLinkForm({ ...linkForm, description: e.target.value })
@@ -875,7 +886,7 @@ export function SettingsPage() {
                   />
                   <input
                     className="input sm:col-span-2"
-                    placeholder="标签，用逗号分隔（最多 8 个）"
+                    placeholder={t("标签，用逗号分隔（最多 8 个）")}
                     value={formatTags(linkForm.tags)}
                     onChange={(e) =>
                       setLinkForm({ ...linkForm, tags: parseTags(e.target.value) })
@@ -912,7 +923,7 @@ export function SettingsPage() {
                         setLinkForm({ ...linkForm, is_public: e.target.checked })
                       }
                     />
-                    公开
+                    {t("公开")}
                   </label>
                   <select
                     className="input"
@@ -924,8 +935,8 @@ export function SettingsPage() {
                       })
                     }
                   >
-                    <option value="hidden">访客隐藏 URL（/go 跳转）</option>
-                    <option value="show">访客直接显示 URL</option>
+                    <option value="hidden">{t("访客隐藏 URL（/go 跳转）")}</option>
+                    <option value="show">{t("访客直接显示 URL")}</option>
                   </select>
                   <select
                     className="input"
@@ -937,11 +948,11 @@ export function SettingsPage() {
                       })
                     }
                   >
-                    <option value="new_tab">新标签页打开</option>
-                    <option value="modal">内置窗口打开</option>
+                    <option value="new_tab">{t("新标签页打开")}</option>
+                    <option value="modal">{t("内置窗口打开")}</option>
                   </select>
                   <div className="rounded-xl border border-border bg-surface-2/40 p-3 sm:col-span-2">
-                    <p className="text-sm font-medium text-foreground">健康检查</p>
+                    <p className="text-sm font-medium text-foreground">{t("健康检查")}</p>
                     <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-foreground">
                       <input
                         type="checkbox"
@@ -954,11 +965,11 @@ export function SettingsPage() {
                           })
                         }
                       />
-                      启用健康检查
+                      {t("启用健康检查")}
                     </label>
                     <div className="mt-3 grid gap-3 sm:grid-cols-3">
                       <label className="block">
-                        <span className="label">间隔（分钟）</span>
+                        <span className="label">{t("间隔（分钟）")}</span>
                         <input
                           type="number"
                           min={1}
@@ -974,7 +985,7 @@ export function SettingsPage() {
                         />
                       </label>
                       <label className="block">
-                        <span className="label">超时（秒）</span>
+                        <span className="label">{t("超时（秒）")}</span>
                         <input
                           type="number"
                           min={0.5}
@@ -991,7 +1002,7 @@ export function SettingsPage() {
                         />
                       </label>
                       <label className="block">
-                        <span className="label">连续失败阈值</span>
+                        <span className="label">{t("连续失败阈值")}</span>
                         <input
                           type="number"
                           min={1}
@@ -1025,14 +1036,14 @@ export function SettingsPage() {
                     status={saveLinkAction.status}
                     className="btn btn-primary sm:col-span-2"
                   >
-                    {linkForm.id === null ? "创建" : "保存修改"}
+                    {linkForm.id === null ? t("创建") : t("保存修改")}
                   </AsyncButton>
                 </form>
 
                 {selectedIds.size > 0 ? (
                   <div className="card flex flex-wrap items-center gap-3 p-4">
                     <span className="text-sm font-medium text-foreground">
-                      已选 {selectedIds.size} 项
+                      {t("已选 {n} 项", { n: selectedIds.size })}
                     </span>
                     <select
                       className="input input-sm max-w-40"
@@ -1040,7 +1051,7 @@ export function SettingsPage() {
                       onChange={(e) => setBatchTargetGroup(e.target.value)}
                       aria-label="移动到分组"
                     >
-                      <option value="">未分组</option>
+                      <option value="">{t("未分组")}</option>
                       {groups.map((group) => (
                         <option key={group.id} value={group.id}>
                           {group.name}
@@ -1053,7 +1064,7 @@ export function SettingsPage() {
                       className="btn btn-ghost h-8 px-3 text-xs"
                       onClick={() => void batchMoveAction.run()}
                     >
-                      移动
+                      {t("移动")}
                     </AsyncButton>
                     <button
                       type="button"
@@ -1061,7 +1072,7 @@ export function SettingsPage() {
                       disabled={batchVisibilityAction.status === "pending"}
                       onClick={() => void batchVisibilityAction.run(true)}
                     >
-                      设为公开
+                      {t("设为公开")}
                     </button>
                     <button
                       type="button"
@@ -1069,21 +1080,21 @@ export function SettingsPage() {
                       disabled={batchVisibilityAction.status === "pending"}
                       onClick={() => void batchVisibilityAction.run(false)}
                     >
-                      设为私密
+                      {t("设为私密")}
                     </button>
                     <button
                       type="button"
                       className="btn btn-danger h-8 px-3 text-xs"
                       onClick={() => setBatchDeleteOpen(true)}
                     >
-                      删除
+                      {t("删除")}
                     </button>
                   </div>
                 ) : null}
 
                 <div className="card p-6">
                   <h2 className="mb-3 text-sm font-semibold text-foreground">
-                    快捷方式（{links.length}）
+                    {t("快捷方式")}（{links.length}）
                   </h2>
                   <div className="table-shell overflow-x-auto">
                     <table>
@@ -1107,10 +1118,10 @@ export function SettingsPage() {
                               }
                             />
                           </th>
-                          <th>名称</th>
-                          <th>内网地址</th>
-                          <th>可见性</th>
-                          <th>操作</th>
+                          <th>{t("名称")}</th>
+                          <th>{t("内网地址")}</th>
+                          <th>{t("可见性")}</th>
+                          <th>{t("操作")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1148,7 +1159,7 @@ export function SettingsPage() {
                                   link.is_public ? "badge-primary" : "badge-muted"
                                 }`}
                               >
-                                {link.is_public ? "公开" : "私密"}
+                                {link.is_public ? t("公开") : t("私密")}
                               </span>
                             </td>
                             <td className="whitespace-nowrap">
@@ -1159,14 +1170,14 @@ export function SettingsPage() {
                                   disabled={fetchIconAction.status === "pending"}
                                   onClick={() => void fetchIconAction.run(link)}
                                 >
-                                  抓图标
+                                  {t("抓图标")}
                                 </button>
                                 <button
                                   type="button"
                                   className="btn btn-ghost h-8 px-3 text-xs"
                                   onClick={() => void toggleLinkAction.run(link)}
                                 >
-                                  切换
+                                  {t("切换")}
                                 </button>
                                 <button
                                   type="button"
@@ -1194,14 +1205,14 @@ export function SettingsPage() {
                                     setDuplicateNotice(null);
                                   }}
                                 >
-                                  编辑
+                                  {t("编辑")}
                                 </button>
                                 <button
                                   type="button"
                                   className="btn btn-danger h-8 px-3 text-xs"
                                   onClick={() => setDeleteLinkId(link.id)}
                                 >
-                                  删除
+                                  {t("删除")}
                                 </button>
                               </div>
                             </td>
@@ -1217,11 +1228,11 @@ export function SettingsPage() {
             {tab === "tags" ? (
               <div className="card p-6">
                 <h2 className="mb-3 text-sm font-semibold text-foreground">
-                  标签（{tags.length}）
+                  {t("标签（{n}）", { n: tags.length })}
                 </h2>
                 {tags.length === 0 ? (
                   <p className="text-sm text-muted">
-                    还没有标签，给快捷方式添加标签后会显示在这里。
+                    {t("还没有标签，给快捷方式添加标签后会显示在这里。")}
                   </p>
                 ) : (
                   <ul className="divide-y divide-border">
@@ -1261,21 +1272,21 @@ export function SettingsPage() {
                                 })
                               }
                             >
-                              保存
+                              {t("保存")}
                             </button>
                             <button
                               type="button"
                               className="btn btn-ghost h-8 px-3 text-xs"
                               onClick={() => setEditingTag(null)}
                             >
-                              取消
+                              {t("取消")}
                             </button>
                           </>
                         ) : (
                           <>
                             <span className="badge badge-muted">{tag.name}</span>
                             <span className="text-xs text-muted">
-                              {tag.count} 个快捷方式
+                              {t("{n} 个快捷方式", { n: tag.count })}
                             </span>
                             <div className="ml-auto flex gap-2">
                               <button
@@ -1286,14 +1297,14 @@ export function SettingsPage() {
                                   setRenameValue(tag.name);
                                 }}
                               >
-                                重命名
+                                {t("重命名")}
                               </button>
                               <button
                                 type="button"
                                 className="btn btn-danger h-8 px-3 text-xs"
                                 onClick={() => setDeleteTagName(tag.name)}
                               >
-                                删除
+                                {t("删除")}
                               </button>
                             </div>
                           </>
@@ -1308,7 +1319,19 @@ export function SettingsPage() {
             {tab === "personal" ? (
               <div className="card max-w-lg space-y-5 p-6">
                 <div>
-                  <span className="label">主题</span>
+                  <span className="label">{t("语言")}</span>
+                  <select
+                    className="input"
+                    value={lang}
+                    onChange={(e) => handleLangChange(e.target.value as Lang)}
+                    aria-label={t("语言")}
+                  >
+                    <option value="zh-CN">中文</option>
+                    <option value="en-US">English</option>
+                  </select>
+                </div>
+                <div>
+                  <span className="label">{t("主题")}</span>
                   <select
                     className="input"
                     value={theme}
@@ -1318,12 +1341,12 @@ export function SettingsPage() {
                       void saveUserAction.run({ theme: next });
                     }}
                   >
-                    <option value="light">浅色</option>
-                    <option value="dark">深色</option>
+                    <option value="light">{t("浅色")}</option>
+                    <option value="dark">{t("深色")}</option>
                   </select>
                 </div>
                 <div>
-                  <span className="label">链接模式</span>
+                  <span className="label">{t("链接模式")}</span>
                   <select
                     className="input"
                     value={linkMode}
@@ -1332,34 +1355,33 @@ export function SettingsPage() {
                       void saveUserAction.run({ link_mode: e.target.value });
                     }}
                   >
-                    <option value="lan">内网优先</option>
-                    <option value="wan">公网优先</option>
+                    <option value="lan">{t("内网优先")}</option>
+                    <option value="wan">{t("公网优先")}</option>
                   </select>
                 </div>
                 <div className="rounded-xl bg-surface-2/60 p-4">
-                  <p className="text-sm font-medium text-foreground">SSO 绑定</p>
+                  <p className="text-sm font-medium text-foreground">{t("SSO 绑定")}</p>
                   {me.sso.bound ? (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <p className="text-sm text-muted">
-                        已绑定：{me.sso.provider}{" "}
-                        {me.sso.email ? `（${me.sso.email}）` : ""}
+                        {t("已绑定：{provider}（{email}）", { provider: me.sso.provider, email: me.sso.email ?? "" })}
                       </p>
                       <button
                         type="button"
                         className="btn btn-danger ml-auto h-8 px-3 text-xs"
                         onClick={() => setUnbindOpen(true)}
                       >
-                        解绑
+                        {t("解绑")}
                       </button>
                     </div>
                   ) : (
-                    <p className="mt-1 text-sm text-muted">未绑定</p>
+                    <p className="mt-1 text-sm text-muted">{t("未绑定")}</p>
                   )}
                 </div>
                 <div className="rounded-xl border border-border p-4">
-                  <p className="text-sm font-medium text-foreground">会话管理</p>
+                  <p className="text-sm font-medium text-foreground">{t("会话管理")}</p>
                   <p className="mt-1 text-xs text-muted">
-                    查看并吊销其他设备上的登录会话。
+                    {t("查看并吊销其他设备上的登录会话。")}
                   </p>
                   {sessions.length > 0 ? (
                     <ul className="mt-3 max-h-40 divide-y divide-border overflow-y-auto rounded-lg border border-border">
@@ -1369,11 +1391,11 @@ export function SettingsPage() {
                           className="flex items-center gap-2 px-3 py-2 text-xs"
                         >
                           <span className="min-w-0 truncate text-muted">
-                            最近使用 {session.last_used_at ?? session.created_at}
+                            {t("最近使用 {time}", { time: session.last_used_at ?? session.created_at })}
                           </span>
                           {session.current ? (
                             <span className="badge badge-primary shrink-0">
-                              当前
+                              {t("当前")}
                             </span>
                           ) : (
                             <button
@@ -1382,7 +1404,7 @@ export function SettingsPage() {
                               disabled={revokeSessionAction.status === "pending"}
                               onClick={() => void revokeSessionAction.run(session.id)}
                             >
-                              吊销
+                              {t("吊销")}
                             </button>
                           )}
                         </li>
@@ -1396,21 +1418,21 @@ export function SettingsPage() {
                       className="btn btn-ghost mt-3 h-8 px-3 text-xs"
                       onClick={() => void revokeAllSessionsAction.run()}
                     >
-                      吊销其他会话
+                      {t("吊销其他会话")}
                     </AsyncButton>
                   ) : null}
                 </div>
                 <div className="rounded-xl border border-border p-4">
-                  <p className="text-sm font-medium text-foreground">RSS 订阅</p>
+                  <p className="text-sm font-medium text-foreground">{t("RSS 订阅")}</p>
                   <p className="mt-1 text-xs text-muted">
-                    最多 3 个订阅源，面板展示最近条目（服务端解析缓存，超时 8s）。
+                    {t("最多 3 个订阅源，面板展示最近条目（服务端解析缓存，超时 8s）。")}
                   </p>
                   <div className="mt-3 space-y-2">
                     {rssUrls.map((url, index) => (
                       <input
                         key={index}
                         className="input input-sm"
-                        placeholder={`订阅源 ${index + 1}（可选）`}
+                        placeholder={t("订阅源 {n}（可选）", { n: index + 1 })}
                         value={url}
                         onChange={(e) =>
                           setRssUrls((current) =>
@@ -1428,13 +1450,13 @@ export function SettingsPage() {
                     className="btn btn-ghost mt-3 h-8 px-3 text-xs"
                     onClick={() => void saveRssAction.run()}
                   >
-                    保存订阅
+                    {t("保存订阅")}
                   </AsyncButton>
                 </div>
                 <div className="rounded-xl border border-border p-4">
-                  <p className="text-sm font-medium text-foreground">数据备份</p>
+                  <p className="text-sm font-medium text-foreground">{t("数据备份")}</p>
                   <p className="mt-1 text-xs text-muted">
-                    导出分组、快捷方式与个人设置；导入为追加合并，不会删除现有数据。
+                    {t("导出分组、快捷方式与个人设置；导入为追加合并，不会删除现有数据。")}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <AsyncButton
@@ -1443,12 +1465,12 @@ export function SettingsPage() {
                       className="btn btn-ghost h-8 px-3 text-xs"
                       onClick={() => void exportBackupAction.run()}
                     >
-                      导出备份
+                      {t("导出备份")}
                     </AsyncButton>
                     <label className="btn btn-ghost h-8 cursor-pointer px-3 text-xs">
                       {importBackupAction.status === "pending"
-                        ? "导入中…"
-                        : "导入备份"}
+                        ? t("导入中…")
+                        : t("导入备份")}
                       <input
                         type="file"
                         accept="application/json,.json"
@@ -1463,7 +1485,7 @@ export function SettingsPage() {
                   </div>
                   {snapshots.length > 0 ? (
                     <div className="mt-4">
-                      <p className="text-xs font-medium text-muted">自动快照</p>
+                      <p className="text-xs font-medium text-muted">{t("自动快照")}</p>
                       <ul className="mt-2 max-h-48 divide-y divide-border overflow-y-auto rounded-lg border border-border">
                         {snapshots.map((snap) => (
                           <li
@@ -1474,14 +1496,14 @@ export function SettingsPage() {
                               {snap.created_at ?? snap.name}
                             </span>
                             <span className="shrink-0 text-muted">
-                              {snap.groups} 组 / {snap.links} 链接
+                              {snap.groups} {t("组")} / {snap.links} {t("链接")}
                             </span>
                             <button
                               type="button"
                               className="btn btn-ghost ml-auto h-7 shrink-0 px-2 text-xs"
                               onClick={() => setRestoreName(snap.name)}
                             >
-                              恢复
+                              {t("恢复")}
                             </button>
                           </li>
                         ))}
@@ -1498,9 +1520,9 @@ export function SettingsPage() {
 
       <ConfirmDialog
         open={deleteGroupId !== null}
-        title="删除分组"
-        message="删除后该分组下的快捷方式将保留为「未分组」。"
-        confirmLabel="删除"
+        title={t("删除分组")}
+        message={t("删除后该分组下的快捷方式将保留为「未分组」。")}
+        confirmLabel={t("删除")}
         status={deleteGroupAction.status}
         onConfirm={() => {
           if (deleteGroupId !== null) void deleteGroupAction.run(deleteGroupId);
@@ -1509,9 +1531,9 @@ export function SettingsPage() {
       />
       <ConfirmDialog
         open={unbindOpen}
-        title="解绑 SSO"
-        message="解绑后仍可用本地账号密码登录，确定继续？"
-        confirmLabel="解绑"
+        title={t("解绑 SSO")}
+        message={t("解绑后仍可用本地账号密码登录，确定继续？")}
+        confirmLabel={t("解绑")}
         status={unbindSsoAction.status}
         onConfirm={() => void unbindSsoAction.run()}
         onCancel={() => {
@@ -1520,29 +1542,29 @@ export function SettingsPage() {
         }}
       >
         <div className="mt-3">
-          <span className="label">本地密码</span>
+          <span className="label">{t("本地密码")}</span>
           <PasswordInput
             value={unbindPassword}
             onChange={(e) => setUnbindPassword(e.target.value)}
             className="input"
             autoComplete="current-password"
-            placeholder="输入本地密码确认"
+            placeholder={t("本地密码")}
           />
         </div>
       </ConfirmDialog>
       <ConfirmDialog
         open={restoreName !== null}
-        title="从快照恢复"
-        message="恢复为追加导入（不会删除现有数据），确定继续？"
-        confirmLabel="恢复"
+        title={t("从快照恢复")}
+        message={t("恢复为追加导入（不会删除现有数据），确定继续？")}
+        confirmLabel={t("恢复")}
         status={restoreSnapshotAction.status}
         onConfirm={() => void restoreSnapshotAction.run()}
         onCancel={() => setRestoreName(null)}
       />
       <ConfirmDialog
         open={deleteTagName !== null}
-        title="删除标签"
-        message={`确定删除标签「${deleteTagName ?? ""}」？会从所有快捷方式中移除该标签。`}
+        title={t("删除标签")}
+        message={t("确定删除标签「{name}」？会从所有快捷方式中移除该标签。", { name: deleteTagName ?? "" })}
         confirmLabel="删除"
         status={deleteTagAction.status}
         onConfirm={() => void deleteTagAction.run()}
@@ -1550,8 +1572,8 @@ export function SettingsPage() {
       />
       <ConfirmDialog
         open={batchDeleteOpen}
-        title="批量删除"
-        message={`确定删除选中的 ${selectedIds.size} 个快捷方式？删除后不可恢复。`}
+        title={t("批量删除")}
+        message={t("确定删除选中的 {n} 个快捷方式？删除后不可恢复。", { n: selectedIds.size })}
         confirmLabel="删除"
         status={batchDeleteAction.status}
         onConfirm={() => void batchDeleteAction.run()}
@@ -1559,8 +1581,8 @@ export function SettingsPage() {
       />
       <ConfirmDialog
         open={deleteLinkId !== null}
-        title="删除快捷方式"
-        message="删除后不可恢复。"
+        title={t("删除快捷方式")}
+        message={t("删除后不可恢复。")}
         confirmLabel="删除"
         status={deleteLinkAction.status}
         onConfirm={() => {

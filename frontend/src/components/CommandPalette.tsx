@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { authApi } from "../api/client";
 import type { LinkOut } from "../api/types";
 import { useTheme } from "../hooks/useTheme";
+import { useI18n } from "../lib/i18n";
 import { Modal } from "./Modal";
 
 interface PaletteItem {
@@ -30,6 +31,7 @@ export function CommandPalette({
   loggedIn: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const { t } = useI18n();
   const [active, setActive] = useState(0);
   const [theme, setTheme] = useTheme();
   const navigate = useNavigate();
@@ -56,7 +58,7 @@ export function CommandPalette({
       ? [
           {
             key: "settings",
-            label: "管理",
+            label: t("管理"),
             hint: "分组与快捷方式",
             run: () => {
               onClose();
@@ -67,7 +69,7 @@ export function CommandPalette({
       : []),
     {
       key: "theme",
-      label: theme === "dark" ? "切换为浅色主题" : "切换为深色主题",
+      label: theme === "dark" ? t("切换为浅色主题") : t("切换为深色主题"),
       run: () => {
         setTheme(theme === "dark" ? "light" : "dark");
         onClose();
@@ -76,7 +78,7 @@ export function CommandPalette({
     loggedIn
       ? {
           key: "logout",
-          label: "退出登录",
+          label: t("退出登录"),
           run: () => {
             onClose();
             void authApi.logout().catch(() => undefined);
@@ -85,7 +87,7 @@ export function CommandPalette({
         }
       : {
           key: "login",
-          label: "登录",
+          label: t("登录"),
           run: () => {
             onClose();
             navigate("/login");
@@ -125,14 +127,14 @@ export function CommandPalette({
     <Modal
       open={open}
       onClose={onClose}
-      title="命令面板"
+      title={t("命令面板")}
       maxWidth="max-w-xl"
     >
       <input
         autoFocus
         className="input"
-        placeholder="搜索快捷方式或输入命令…"
-        aria-label="命令面板搜索"
+        placeholder={t("搜索快捷方式或输入命令…")}
+        aria-label={t("搜索")}
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -152,7 +154,7 @@ export function CommandPalette({
         }}
       />
       {items.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">没有匹配结果</p>
+        <p className="mt-4 text-sm text-muted">{t("没有匹配结果")}</p>
       ) : (
         <ul
           role="listbox"

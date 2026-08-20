@@ -46,3 +46,11 @@ def test_user_settings(client, auth_headers):
     assert client.put(
         "/api/settings", json={"theme": "nope"}, headers=auth_headers
     ).status_code == 422
+
+
+def test_user_lang_roundtrip(client, auth_headers):
+    r = client.put("/api/settings", json={"lang": "en-US"}, headers=auth_headers)
+    assert r.status_code == 200
+    assert client.get("/api/settings", headers=auth_headers).json()["lang"] == "en-US"
+    r2 = client.put("/api/settings", json={"lang": "fr-FR"}, headers=auth_headers)
+    assert r2.status_code == 422
