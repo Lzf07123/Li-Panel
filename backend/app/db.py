@@ -121,14 +121,35 @@ def init_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+_DATA_MUTATION_PREFIXES = (
+    "/api/groups", "/api/links", "/api/tags", "/api/settings",
+    "/api/site-settings", "/api/backup",
+)
+
+
+def _maybe_write_snapshot(request: Request, conn: sqlite3.Connection) -> None:
+    """数据变更提交后写自动快照（V19）；仅当连接实际有变更且路径属于数据接口。"""
+    if conn.total_changes == 0:
+        return
+    if not request.url.path.startswith(_DATA_MUTATION_PREFIXES):
+        return
+    from app.snapshot import write_snapshot
+
+    settings = request.app.state.settings
+    write_snapshot(settings.data_dir, settings.db_path, settings.backup_keep)
+
+
 def get_db(request: Request) -> Iterator[sqlite3.Connection]:
     """FastAPI 依赖：请求级 SQLite 连接，结束自动 commit/close。"""
     db_path: Path = request.app.state.db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
+    before = conn.total_changes
     try:
         yield conn
         conn.commit()
+        if conn.total_changes > before:
+            _maybe_write_snapshot(request, conn)
     finally:
         conn.close()
 

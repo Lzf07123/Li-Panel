@@ -145,5 +145,6 @@
 - ✅ V16（标签管理页）：2026-08-21 完成。`GET /api/tags` 统计、`PUT/DELETE /api/tags/{tag}` 重命名/删除（全量更新、去重保序、用户隔离、URL 编码中文标签）；管理页「标签管理」标签页（列表/计数/行内重命名/删除确认）。pytest 65 passed；Playwright 端到端：重命名 代码→工程 成功。
 - ✅ V17（重复检测）：2026-08-21 完成。创建/编辑同名或同 URL 返回 409（结构化 `{code,message}`，忽略自身、大小写不敏感），`force=true` 可强制保存；前端表单显示提示 + 「仍要保存」。pytest 70 passed；Playwright 端到端：409 → 提示 → 强制保存 201。
 - ✅ V18（JSON 备份导出/导入）：2026-08-21 完成。`GET/POST /api/backup`（分组/链接/个人设置；管理员含站点设置；导入校验 URL/结构后追加，不删除现有数据）；个人设置页「数据备份」导出下载/导入合并。pytest 76 passed；Playwright 端到端：导出 3 组/11 链接 → 导入后 6 组/22 链接。
-- ⬜ V19–V50：待执行；每版独立提交。
+- ✅ V19（自动快照备份）：2026-08-21 完成。数据接口提交后（`total_changes` 精确检测）写 `data/backups/snapshot-*.json`，`PANEL_BACKUP_KEEP`（默认 10）滚动清理；登录等非数据请求不写。pytest 79 passed。
+- ⬜ V20–V50：待执行；每版独立提交。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。
