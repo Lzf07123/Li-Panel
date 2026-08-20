@@ -41,6 +41,8 @@ def _build_csp(settings: Settings) -> str:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
+    if settings.environment == "production" and len(settings.secret_key) < 32:
+        raise RuntimeError("PANEL_SECRET_KEY 长度必须 ≥ 32 字符（生产环境）")
     app = FastAPI(
         title="Li&Panel",
         docs_url=None if settings.environment == "production" else "/docs",

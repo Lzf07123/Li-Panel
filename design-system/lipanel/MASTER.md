@@ -99,6 +99,7 @@
 - V37 会话管理：`GET /api/sessions`（current 标记）、`DELETE /api/sessions/{id}`（当前拒绝 400、跨用户 404）、`DELETE /api/sessions`（吊销其他）；个人设置页会话卡片；pytest 138 passed
 - V38 审计日志：`audit_logs` 表 + `app/audit.py`（登录/登出/SSO 绑定解绑/备份恢复/站点设置变更，滚动 1000 条）；`GET /api/audit-logs` admin-only；pytest 142 passed
 - V39 安全响应头：CSP `font-src`、COOP/CORP same-origin、Permissions-Policy、HSTS 可配；pytest 144 passed
+- V40 密钥与上传加固：`PANEL_HOST_COOKIE`（`__Host-` 前缀，cookie 名全链路变量化）；上传魔数校验；生产 secret ≥32 启动校验；pytest 148 passed
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

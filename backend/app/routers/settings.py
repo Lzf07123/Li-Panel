@@ -132,6 +132,21 @@ def user_settings_put(
     return user_settings_get(user, conn)
 
 
+MAGIC_BYTES = {
+    "png": b"\x89PNG\r\n\x1a\n",
+    "jpg": b"\xff\xd8\xff",
+    "jpeg": b"\xff\xd8\xff",
+    "gif": b"GIF8",
+}
+
+
+def _magic_ok(ext: str, data: bytes) -> bool:
+    signature = MAGIC_BYTES.get(ext)
+    if signature is None:  # webp：RIFF....WEBP
+        return data.startswith(b"RIFF") and data[8:12] == b"WEBP"
+    return data.startswith(signature)
+
+
 @router.post("/api/uploads")
 def upload_file(
     request: Request,
@@ -146,6 +161,8 @@ def upload_file(
     data = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=422, detail="图片不能超过 2MB")
+    if not _magic_ok(ext, data):
+        raise HTTPException(status_code=422, detail="文件内容与扩展名不符")
     name = f"{uuid4().hex}.{ext}"
     uploads_dir = request.app.state.settings.uploads_dir
     uploads_dir.mkdir(parents=True, exist_ok=True)

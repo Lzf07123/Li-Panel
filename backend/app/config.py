@@ -43,6 +43,11 @@ class Settings:
     login_max_fails: int
     login_lock_minutes: int
     hsts: bool
+    host_cookie: bool
+
+    @property
+    def session_cookie(self) -> str:
+        return "__Host-lipanel_session" if self.host_cookie else "lipanel_session"
 
     @property
     def db_path(self) -> Path:
@@ -117,4 +122,5 @@ def load_settings(overrides: dict | None = None) -> Settings:
         if "login_lock_minutes" in o
         else _env_int("PANEL_LOGIN_LOCK_MINUTES", 15),
         hsts=flag("hsts", "PANEL_HSTS", False),
+        host_cookie=flag("host_cookie", "PANEL_HOST_COOKIE", False),
     )

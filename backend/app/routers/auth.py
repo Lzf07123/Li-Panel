@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Annotated
-
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from app.db import get_db, get_user_by_username
@@ -47,7 +45,7 @@ def login(
     write_audit(conn, user["id"], "login", body.username)
     token = create_session(conn, user["id"], session_days=settings.session_days)
     response.set_cookie(
-        "lipanel_session",
+        settings.session_cookie,
         token,
         max_age=settings.session_days * 86400,
         httponly=True,
@@ -61,17 +59,19 @@ def login(
 @router.post("/logout", status_code=204)
 def logout(
     response: Response,
-    lipanel_session: Annotated[str | None, Cookie()] = None,
+    request: Request,
     conn: sqlite3.Connection = Depends(get_db),
 ) -> None:
-    if lipanel_session:
+    cookie_name = request.app.state.settings.session_cookie
+    token = request.cookies.get(cookie_name)
+    if token:
         row = conn.execute(
-            "SELECT user_id FROM sessions WHERE token = ?", (lipanel_session,)
+            "SELECT user_id FROM sessions WHERE token = ?", (token,)
         ).fetchone()
         if row is not None:
             write_audit(conn, row["user_id"], "logout", "")
-        delete_session(conn, lipanel_session)
-    response.delete_cookie("lipanel_session", path="/")
+        delete_session(conn, token)
+    response.delete_cookie(cookie_name, path="/")
 
 
 @router.get("/me")

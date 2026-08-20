@@ -391,7 +391,7 @@ def sso_link(
     )
     response = JSONResponse(status_code=status, content={"ok": True})
     response.set_cookie(
-        "lipanel_session",
+        settings.session_cookie,
         session_token,
         max_age=settings.session_days * 86400,
         httponly=True,
@@ -406,11 +406,12 @@ def sso_link(
 def logout_uri(
     request: Request,
     next: str | None = None,
-    lipanel_session: Annotated[str | None, Cookie()] = None,
     conn: sqlite3.Connection = Depends(get_db),
 ) -> RedirectResponse:
-    if lipanel_session:
-        delete_session(conn, lipanel_session)
+    settings = request.app.state.settings
+    token = request.cookies.get(settings.session_cookie)
+    if token:
+        delete_session(conn, token)
     target = next or "/"
     parsed = urlparse(target)
     host = request.headers.get("host", "").split(":")[0]
@@ -419,5 +420,5 @@ def logout_uri(
     elif parsed.netloc and parsed.hostname != host:
         target = "/"
     response = RedirectResponse(target, status_code=302)
-    response.delete_cookie("lipanel_session", path="/")
+    response.delete_cookie(settings.session_cookie, path="/")
     return response
