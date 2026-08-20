@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.brand_defaults import get_site_settings
 from app.db import get_db
 from app.deps import current_user
 from app.health import check_url, get_cached, set_cached
@@ -26,20 +27,8 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-@router.get("/links")
-def health_links(
-    request: Request,
-    user: sqlite3.Row = Depends(current_user),
-    conn: sqlite3.Connection = Depends(get_db),
-) -> dict:
-    """当前用户全部链接的健康状态（up/down/unknown + 响应毫秒），并发 ≤4。"""
-    settings = request.app.state.settings
-    if not settings.health_check:
-        return {"enabled": False, "results": []}
-    links = conn.execute(
-        "SELECT id, url_lan, url_wan FROM links WHERE user_id = ?", (user["id"],)
-    ).fetchall()
-
+def _check_many(links: list[sqlite3.Row]) -> list[dict]:
+    """并发 ≤4 检查链接列表，返回按 link_id 排序的结果。"""
     results: list[dict] = []
     pending: dict = {}
     for link in links:
@@ -56,7 +45,6 @@ def health_links(
             )
         else:
             pending[link["id"]] = link
-
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         futures = {
             pool.submit(check_url, _effective_url(link)): link_id
@@ -75,9 +63,43 @@ def health_links(
                 }
             )
     results.sort(key=lambda item: item["link_id"])
+    return results
 
+
+@router.get("/links")
+def health_links(
+    request: Request,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """当前用户全部链接的健康状态（up/down/unknown + 响应毫秒），并发 ≤4。"""
+    settings = request.app.state.settings
+    if not settings.health_check:
+        return {"enabled": False, "results": []}
+    links = conn.execute(
+        "SELECT id, url_lan, url_wan FROM links WHERE user_id = ?", (user["id"],)
+    ).fetchall()
+    results = _check_many(links)
     _record_samples(conn, user["id"], results)
     return {"enabled": True, "results": results}
+
+
+@router.get("/status")
+def public_status(
+    request: Request,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """公开状态页：仅公开链接的可用性汇总（访客可读）。"""
+    settings = request.app.state.settings
+    site = get_site_settings(conn)
+    if not (site.get("public_mode", "true") == "true" and settings.public_mode):
+        raise HTTPException(status_code=401, detail="访客视图已关闭")
+    if not settings.health_check:
+        return {"enabled": False, "results": []}
+    links = conn.execute(
+        "SELECT id, url_lan, url_wan FROM links WHERE is_public = 1"
+    ).fetchall()
+    return {"enabled": True, "results": _check_many(links)}
 
 
 def _record_samples(

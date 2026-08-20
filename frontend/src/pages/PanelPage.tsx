@@ -89,7 +89,23 @@ export function PanelPage() {
           })
           .catch(() => undefined);
       })
-      .catch(() => setMe(null));
+      .catch(() => {
+        setMe(null);
+        // V27：访客公开状态页
+        void healthApi
+          .status()
+          .then((data) => {
+            const map: Record<
+              number,
+              { status: "up" | "down" | "unknown"; ms: number | null }
+            > = {};
+            for (const item of data.results) {
+              map[item.link_id] = { status: item.status, ms: item.ms };
+            }
+            setLinkHealth(map);
+          })
+          .catch(() => undefined);
+      });
     panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, []);
 

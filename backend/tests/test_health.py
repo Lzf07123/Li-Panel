@@ -221,3 +221,38 @@ def test_history_foreign_404(client, auth_headers, health_server):
     )
     bh = {"Cookie": f"lipanel_session={b.cookies['lipanel_session']}"}
     assert client.get(f"/api/health/links/{lid}/history", headers=bh).status_code == 404
+
+
+def test_public_status_only_public(client, auth_headers, health_server):
+    client.post(
+        "/api/links",
+        json={"name": "公开", "url_lan": health_server, "is_public": True},
+        headers=auth_headers,
+    )
+    client.post(
+        "/api/links",
+        json={"name": "私密", "url_lan": health_server + "/private", "is_public": False},
+        headers=auth_headers,
+    )
+    r = client.get("/api/health/status")
+    assert r.status_code == 200
+    links = client.get("/api/links", headers=auth_headers).json()
+    public_id = next(l["id"] for l in links if l["name"] == "公开")
+    private_id = next(l["id"] for l in links if l["name"] == "私密")
+    ids = [item["link_id"] for item in r.json()["results"]]
+    assert public_id in ids and private_id not in ids
+
+
+def test_public_status_respects_public_mode(client, auth_headers, health_server, tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    app = create_app(
+        load_settings(
+            overrides={"data_dir": str(tmp_path), "secret_key": "x", "public_mode": False}
+        )
+    )
+    c = TestClient(app)
+    assert c.get("/api/health/status").status_code == 401

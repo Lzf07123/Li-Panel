@@ -154,5 +154,6 @@
 - ✅ V24（时钟小组件）：2026-08-21 完成（前端显示优化分支 `codex/frontend-display` 先行落地，`DateTimeWidget` 本地时区秒级更新，375px 不溢出；此处回填验收状态）。
 - ✅ V25（问候与快捷入口）：2026-08-21 完成。问候语（早晚/午/夜，登录显示用户名）+ 「今天」常用入口（当天打开的快捷方式 chips，无当天记录回退最近使用）。Playwright 端到端：chips 渲染。
 - ✅ V26（RSS/ATOM 小组件）：2026-08-21 完成。`app/rss.py` 受控抓取（≤3 源、8s 超时、并发 ≤3、10min 缓存、标准库 XML 解析 RSS/Atom）；`PUT /api/settings` 支持 `rss_feeds`（URL 校验、≤3）；`GET /api/rss`；个人设置页订阅管理 + 面板「订阅」折叠卡片。pytest 98 passed；Playwright 端到端：保存订阅 200 → 面板订阅区显示。顺带根治 SQLite `database is locked`（自动提交 + busy_timeout）。
-- ⬜ V27–V30：待执行。
+- ✅ V27（公开状态页）：2026-08-21 完成。`GET /api/health/status` 访客可用，仅返回公开链接状态（遵循 public_mode，私密绝不下发）；访客面板卡片显示状态点。pytest 100 passed；Playwright 端到端：访客看到 28 个公开链接状态点。
+- ⬜ V28–V30：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

@@ -86,6 +86,7 @@
 - V24 时钟小组件：`DateTimeWidget` 本地时区秒级更新（路线图验收回填，实现于 `codex/frontend-display`）
 - V25 问候与「今天」常用入口：时间段问候（登录显示用户名）+ 当天打开快捷方式 chips（无当天记录回退最近使用）；Playwright 验证 chips 渲染
 - V26 RSS/ATOM 小组件：`app/rss.py`（≤3 源、8s 超时、并发 ≤3、10min 缓存、标准库 XML）；`rss_feeds` 用户设置（校验/上限）；`GET /api/rss`；个人设置页订阅管理、面板「订阅」折叠卡片；SQLite 改自动提交（`isolation_level=None`）+ `busy_timeout` 根治锁冲突；pytest 98 passed，Playwright 端到端通过
+- V27 公开状态页：`GET /api/health/status`（无鉴权但遵循 public_mode，仅 is_public 链接、健康检查复用并发/缓存）；访客面板状态点；pytest 100 passed，Playwright 访客 28 个公开链接状态点通过
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

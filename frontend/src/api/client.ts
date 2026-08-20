@@ -113,6 +113,11 @@ export const authApi = {
 };
 
 export const healthApi = {
+  status: () =>
+    api<{
+      enabled: boolean;
+      results: { link_id: number; status: "up" | "down"; ms: number; checked_at: string }[];
+    }>("/api/health/status"),
   links: () =>
     api<{
       enabled: boolean;
