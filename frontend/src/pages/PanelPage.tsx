@@ -6,6 +6,7 @@ import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
+import { CommandPalette } from "../components/CommandPalette";
 import { LinkCard } from "../components/LinkCard";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { SiteFooter } from "../components/SiteFooter";
@@ -32,11 +33,23 @@ export function PanelPage() {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [recents, setRecents] = useState<RecentItem[]>(getRecent);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     authApi.meSilent().then(setMe).catch(() => setMe(null));
     panelApi.get().then(setPanel).catch(() => setPanel(null));
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   const groups = useMemo(
@@ -238,6 +251,7 @@ export function PanelPage() {
               className="input pl-9"
               placeholder="搜索名称、描述、标签…"
               aria-label="搜索快捷方式"
+              title="按 / 聚焦；Ctrl/⌘ + K 打开命令面板"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -384,6 +398,12 @@ export function PanelPage() {
         </main>
         <SiteFooter />
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        links={allLinks}
+        loggedIn={Boolean(me)}
+      />
     </div>
   );
 }
