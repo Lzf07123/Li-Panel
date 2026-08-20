@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { authApi, linksApi, panelApi } from "../api/client";
+import { authApi, healthApi, linksApi, panelApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
@@ -44,13 +44,34 @@ export function PanelPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(
     loadCollapsedGroups,
   );
+  const [linkHealth, setLinkHealth] = useState<
+    Record<number, { status: "up" | "down" | "unknown"; ms: number | null }>
+  >({});
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const toast = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    authApi.meSilent().then(setMe).catch(() => setMe(null));
+    authApi
+      .meSilent()
+      .then((current) => {
+        setMe(current);
+        void healthApi
+          .links()
+          .then((data) => {
+            const map: Record<
+              number,
+              { status: "up" | "down" | "unknown"; ms: number | null }
+            > = {};
+            for (const item of data.results) {
+              map[item.link_id] = { status: item.status, ms: item.ms };
+            }
+            setLinkHealth(map);
+          })
+          .catch(() => undefined);
+      })
+      .catch(() => setMe(null));
     panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, []);
 
@@ -522,6 +543,8 @@ export function PanelPage() {
                         )}
                         draggable={canDrag}
                         isDragOver={dragOverId === link.id}
+                        status={linkHealth[link.id]?.status}
+                        statusMs={linkHealth[link.id]?.ms}
                         onDragStart={(link) => setDragId(link.id)}
                         onDragOver={(link) => setDragOverId(link.id)}
                         onDrop={handleDrop}
@@ -555,6 +578,8 @@ export function PanelPage() {
                     )}
                     draggable={canDrag}
                     isDragOver={dragOverId === link.id}
+                    status={linkHealth[link.id]?.status}
+                    statusMs={linkHealth[link.id]?.ms}
                     onDragStart={(link) => setDragId(link.id)}
                     onDragOver={(link) => setDragOverId(link.id)}
                     onDrop={handleDrop}

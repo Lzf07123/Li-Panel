@@ -112,6 +112,14 @@ export const authApi = {
     }),
 };
 
+export const healthApi = {
+  links: () =>
+    api<{
+      enabled: boolean;
+      results: { link_id: number; status: "up" | "down"; ms: number; checked_at: string }[];
+    }>("/api/health/links"),
+};
+
 export const panelApi = {
   get: () => api<PanelOut>("/api/panel"),
 };

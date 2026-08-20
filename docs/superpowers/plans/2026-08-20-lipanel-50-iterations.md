@@ -149,5 +149,6 @@
 - ✅ V20（恢复向导）：2026-08-21 完成。`GET /api/backup/snapshots` 预览条数（管理员）、`POST /api/backup/restore/{name}` 快照追加恢复（文件名白名单、按 user_id 过滤、管理员含站点设置）；个人设置页快照列表 + 确认弹窗。pytest 83 passed；Playwright 端到端：快照列表 → 恢复 → 链接 22→44。
 - ✅ Phase B（V11–V20）全部完成：2026-08-21，提交范围 `6f01ab3`（V11）→ `3313a50`（V20）。
 - ✅ V21（链接健康检查引擎）：2026-08-21 完成。`GET /api/health/links` 受控检查（`PANEL_HEALTH_CHECK` 开关、HEAD 优先 405/501 回退 GET、5s 超时、并发 ≤4、60s 缓存、<500 视为 up）；仅本人链接。pytest 89 passed（本地 fixture：up/down/缓存/关闭/隔离）。
-- ⬜ V22–V30：待执行。
+- ✅ V22（卡片状态点）：2026-08-21 完成。面板卡片状态点（up 绿 / down 红 / unknown 灰），hover 显示响应毫秒；健康检查并发化（ThreadPoolExecutor≤4）；SQLite `busy_timeout=10s` 硬化。pytest 89 passed；Playwright 端到端：44 个链接状态点全部渲染（在线/离线）。
+- ⬜ V23–V30：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

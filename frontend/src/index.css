@@ -532,6 +532,12 @@
     border-radius: 9999px;
     background: var(--lipanel-muted);
   }
+  .status-dot-up {
+    background: var(--lipanel-success);
+  }
+  .status-dot-down {
+    background: var(--lipanel-destructive);
+  }
   .status-connecting {
     background: var(--lipanel-warning);
   }

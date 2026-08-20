@@ -81,6 +81,7 @@
 - V19 自动快照备份：`app/snapshot.py` 在 `get_db` 提交后按 `conn.total_changes` 精确检测数据变更，写 `data/backups/snapshot-{ts}.json`（全量 groups/links/settings/site_settings），`PANEL_BACKUP_KEEP` 滚动清理；登录/只读不写；pytest 79 passed
 - V20 恢复向导：`GET /api/backup/snapshots`（管理员，快照预览条数）、`POST /api/backup/restore/{name}`（文件名白名单、快照行按 user_id 过滤后追加导入、管理员含 site_settings）；个人设置页自动快照列表 + 恢复确认弹窗；pytest 83 passed，Playwright 快照列表→恢复→追加导入端到端通过
 - V21 链接健康检查引擎：`app/health.py` 受控出站（`PANEL_HEALTH_CHECK`、HEAD 优先 405/501 回退 GET、5s 超时、BoundedSemaphore(4)、60s 缓存、<500 up）；`GET /api/health/links` 仅返回本人链接状态；pytest 89 passed（本地 fixture up/down/缓存/关闭/隔离）
+- V22 卡片状态点：`.status-dot-up/down` 语义色（复用 success/destructive 令牌）；`LinkCard` 状态点 + hover 毫秒 title；健康检查改为 ThreadPoolExecutor≤4 并发（面板秒级返回）；`connect(..., timeout=10)` + `PRAGMA busy_timeout=10000`；pytest 89 passed，Playwright 44 链接状态点全部渲染
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

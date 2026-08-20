@@ -9,6 +9,8 @@ export function LinkCard({
   onOpenModal,
   draggable = false,
   isDragOver = false,
+  status,
+  statusMs,
   onDragStart,
   onDragOver,
   onDrop,
@@ -20,6 +22,8 @@ export function LinkCard({
   onOpenModal?: (link: LinkOut) => void;
   draggable?: boolean;
   isDragOver?: boolean;
+  status?: "up" | "down" | "unknown";
+  statusMs?: number | null;
   onDragStart?: (link: LinkOut) => void;
   onDragOver?: (link: LinkOut) => void;
   onDrop?: (link: LinkOut) => void;
@@ -102,6 +106,32 @@ export function LinkCard({
           </span>
         ) : null}
       </span>
+      {status ? (
+        <span
+          role="img"
+          aria-label={
+            status === "up"
+              ? "在线"
+              : status === "down"
+                ? "离线"
+                : "状态未知"
+          }
+          title={
+            status === "up"
+              ? `在线${statusMs != null ? ` · ${statusMs}ms` : ""}`
+              : status === "down"
+                ? "离线"
+                : "状态未知"
+          }
+          className={`status-dot shrink-0 ${
+            status === "up"
+              ? "status-dot-up"
+              : status === "down"
+                ? "status-dot-down"
+                : ""
+          }`}
+        />
+      ) : null}
       <svg
         viewBox="0 0 24 24"
         fill="none"
