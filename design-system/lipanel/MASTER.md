@@ -35,6 +35,14 @@
 | `/` 面板 | AppHeader + `max-w-7xl` 内容 | 10（soft） |
 | `/settings` 管理 | AppHeader + 表单/卡片 | 4×0.5 |
 
+## 修复记录
+
+2026-08-21 面板重复分组与健康检测触发修复：
+
+- 备份导入/恢复按分组名（大小写不敏感）合并复用，不再创建同名重复分组；链接仍按追加语义进入对应分组（`backend/app/routers/backup.py`）
+- 健康检测由用户侧发起：首次进入面板与回到面板（标签页可见性恢复 / 窗口聚焦 / 从其他页返回）时以 `?refresh=1` 强制重新检测，忽略服务端 60s 缓存（`backend/app/routers/health.py`、`frontend/src/pages/PanelPage.tsx`）
+- 验证：pytest 153 passed；Playwright 端到端——备份导入两次后分组仍为 2（无重复）、面板加载与 focus 事件均触发 `?refresh=1` 检测
+
 ## 验收状态
 
 2026-08-20 端口变量化重建实测：

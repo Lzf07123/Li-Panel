@@ -502,3 +502,19 @@ def test_export_isolation(client, auth_headers, health_server):
     )
     bh = {"Cookie": f"lipanel_session={b.cookies['lipanel_session']}"}
     assert client.get("/api/health/export?format=json", headers=bh).json() == []
+
+
+def test_health_refresh_bypasses_cache(client, auth_headers, health_server):
+    from app import health as health_module
+
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    client.get("/api/health/links", headers=auth_headers)
+    first = REQUESTS["count"]
+    client.get("/api/health/links", headers=auth_headers)
+    assert REQUESTS["count"] == first  # 60s 缓存内不重复出站
+    client.get("/api/health/links?refresh=1", headers=auth_headers)
+    assert REQUESTS["count"] > first  # 用户侧强制刷新会重新检测

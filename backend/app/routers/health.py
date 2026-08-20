@@ -37,12 +37,17 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _check_many(links: list[sqlite3.Row]) -> list[dict]:
-    """并发 ≤4 检查链接列表（按链接自身超时），返回按 link_id 排序的结果。"""
+def _check_many(
+    links: list[sqlite3.Row], refresh: bool = False
+) -> list[dict]:
+    """并发 ≤4 检查链接列表（按链接自身超时），返回按 link_id 排序的结果。
+
+    refresh=True 时忽略内存缓存（用户侧「回到面板」强制重新检测）。
+    """
     results: list[dict] = []
     pending: dict = {}
     for link in links:
-        cached = get_cached(link["id"])
+        cached = None if refresh else get_cached(link["id"])
         if cached is not None:
             status, ms = cached
             results.append(
@@ -83,8 +88,9 @@ def health_links(
     request: Request,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
+    refresh: bool = False,
 ) -> dict:
-    """当前用户全部启用检测链接的健康状态；每链接开关/间隔/超时/阈值。"""
+    """当前用户全部启用检测链接的健康状态；refresh=1 忽略缓存强制检测。"""
     settings = request.app.state.settings
     if not settings.health_check:
         return {"enabled": False, "results": []}
@@ -92,7 +98,7 @@ def health_links(
         f"SELECT {LINK_COLS} FROM links WHERE user_id = ? AND health_enabled = 1",
         (user["id"],),
     ).fetchall()
-    results = _check_many(links)
+    results = _check_many(links, refresh=refresh)
     _record_samples(conn, user["id"], results, links)
     return {"enabled": True, "results": results}
 
@@ -101,6 +107,7 @@ def health_links(
 def public_status(
     request: Request,
     conn: sqlite3.Connection = Depends(get_db),
+    refresh: bool = False,
 ) -> dict:
     """公开状态页：仅公开且启用检测的链接可用性汇总（访客可读）。"""
     settings = request.app.state.settings
@@ -112,7 +119,7 @@ def public_status(
     links = conn.execute(
         f"SELECT {LINK_COLS} FROM links WHERE is_public = 1 AND health_enabled = 1"
     ).fetchall()
-    return {"enabled": True, "results": _check_many(links)}
+    return {"enabled": True, "results": _check_many(links, refresh=refresh)}
 
 
 def _record_samples(

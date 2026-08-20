@@ -113,16 +113,16 @@ export const authApi = {
 };
 
 export const healthApi = {
-  status: () =>
+  status: (refresh = false) =>
     api<{
       enabled: boolean;
       results: { link_id: number; status: "up" | "down"; ms: number; checked_at: string }[];
-    }>("/api/health/status"),
-  links: () =>
+    }>(`/api/health/status${refresh ? "?refresh=1" : ""}`),
+  links: (refresh = false) =>
     api<{
       enabled: boolean;
       results: { link_id: number; status: "up" | "down"; ms: number; checked_at: string }[];
-    }>("/api/health/links"),
+    }>(`/api/health/links${refresh ? "?refresh=1" : ""}`),
   history: (linkId: number) =>
     api<
       { status: "up" | "down"; ms: number; checked_at: string }[]

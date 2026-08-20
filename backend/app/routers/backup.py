@@ -65,24 +65,37 @@ def _apply_backup(
         "SELECT COALESCE(MAX(sort_order), -1) AS m FROM groups WHERE user_id = ?",
         (user["id"],),
     ).fetchone()["m"]
+    # 同名分组（大小写不敏感）合并复用，避免恢复/导入产生重复分组
+    existing_groups = {
+        row["name"].strip().lower(): row["id"]
+        for row in conn.execute(
+            "SELECT id, name FROM groups WHERE user_id = ?", (user["id"],)
+        ).fetchall()
+    }
     group_id_map: dict[int, int] = {}
     for index, group in enumerate(data.get("groups", [])):
         if not isinstance(group, dict) or not isinstance(group.get("name"), str):
             raise HTTPException(status_code=400, detail="备份文件格式错误：groups 项缺少名称")
-        cur = conn.execute(
-            "INSERT INTO groups (user_id, name, icon, is_public, sort_order) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (
-                user["id"],
-                group["name"],
-                group.get("icon"),
-                int(bool(group.get("is_public"))),
-                max_sort + 1 + index,
-            ),
-        )
+        name_key = group["name"].strip().lower()
+        if name_key in existing_groups:
+            group_id = existing_groups[name_key]
+        else:
+            cur = conn.execute(
+                "INSERT INTO groups (user_id, name, icon, is_public, sort_order) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (
+                    user["id"],
+                    group["name"],
+                    group.get("icon"),
+                    int(bool(group.get("is_public"))),
+                    max_sort + 1 + index,
+                ),
+            )
+            group_id = int(cur.lastrowid)
+            existing_groups[name_key] = group_id
         old_id = group.get("id")
         if isinstance(old_id, int):
-            group_id_map[old_id] = int(cur.lastrowid)
+            group_id_map[old_id] = group_id
 
     max_link_sort = conn.execute(
         "SELECT COALESCE(MAX(sort_order), -1) AS m FROM links WHERE user_id = ?",

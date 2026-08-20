@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { authApi, healthApi, linksApi, panelApi, rssApi } from "../api/client";
@@ -67,49 +67,65 @@ export function PanelPage() {
   const toast = useToast();
   const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
+  const meRef = useRef<MeOut | null>(null);
+  useEffect(() => {
+    meRef.current = me;
+  }, [me]);
+
+  /** 站点连接检测由用户侧发起：refresh=true 强制重新检测（忽略服务端缓存）。 */
+  const loadHealth = useCallback((refresh: boolean) => {
+    const target = meRef.current
+      ? healthApi.links(refresh)
+      : healthApi.status(refresh);
+    void target
+      .then((data) => {
+        const map: Record<
+          number,
+          { status: "up" | "down" | "unknown"; ms: number | null }
+        > = {};
+        for (const item of data.results) {
+          map[item.link_id] = { status: item.status, ms: item.ms };
+        }
+        setLinkHealth(map);
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     authApi
       .meSilent()
       .then((current) => {
+        meRef.current = current;
         setMe(current);
         void rssApi
           .feeds()
           .then(setRssData)
           .catch(() => setRssData(null));
-        void healthApi
-          .links()
-          .then((data) => {
-            const map: Record<
-              number,
-              { status: "up" | "down" | "unknown"; ms: number | null }
-            > = {};
-            for (const item of data.results) {
-              map[item.link_id] = { status: item.status, ms: item.ms };
-            }
-            setLinkHealth(map);
-          })
-          .catch(() => undefined);
+        // 首次进入面板：立即检测
+        loadHealth(true);
       })
       .catch(() => {
+        meRef.current = null;
         setMe(null);
-        // V27：访客公开状态页
-        void healthApi
-          .status()
-          .then((data) => {
-            const map: Record<
-              number,
-              { status: "up" | "down" | "unknown"; ms: number | null }
-            > = {};
-            for (const item of data.results) {
-              map[item.link_id] = { status: item.status, ms: item.ms };
-            }
-            setLinkHealth(map);
-          })
-          .catch(() => undefined);
+        // 访客公开状态页：首次进入立即检测
+        loadHealth(true);
       });
     panelApi.get().then(setPanel).catch(() => setPanel(null));
-  }, []);
+  }, [loadHealth]);
+
+  // 回到面板（标签页恢复可见 / 窗口重新聚焦）：重新检测
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadHealth(true);
+    };
+    const onFocus = () => loadHealth(true);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadHealth]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
