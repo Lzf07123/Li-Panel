@@ -16,7 +16,14 @@ from app.routers import settings as settings_router
 from app.security import RateLimiter
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+DIST_CANDIDATES = [
+    PROJECT_ROOT / "frontend" / "dist",
+    Path.cwd() / "frontend" / "dist",
+]
+FRONTEND_DIST = next(
+    (path for path in DIST_CANDIDATES if (path / "index.html").is_file()),
+    PROJECT_ROOT / "frontend" / "dist",
+)
 
 CSP = (
     "default-src 'self'; style-src 'self'; img-src 'self' data: https:; "
