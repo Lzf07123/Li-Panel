@@ -28,4 +28,12 @@
 
 ## 验收状态
 
-随实现任务更新；最终对照 Li&Design 第 6 章清单在 Task 20 回填。
+2026-08-20 首版交付实测：
+
+- 后端：pytest 35 passed（认证/SSO/可见性/隔离/站点设置）
+- 前端：`tsc --noEmit` + `vite build` 通过；产物 JS gzip 80.1KB、CSS gzip 6.2KB
+- 容器：`docker stats` 实测内存 45.78MiB、CPU 0.19%、2 个进程（目标 50–90MB，达标）
+- 端到端：初始化管理员 → 登录 → 建分组/链接 → 访客面板（私密不可见、URL 隐藏）→ `/go/{id}` 302 跳转 全部通过
+- 加速源：`IMAGE_REGISTRY=docker.m.daocloud.io/library` 完成镜像构建验证
+
+视觉对照 Li&Design 第 6 章清单的自动化部分已核对；四档响应式与对比度建议在浏览器中人工复核。
