@@ -60,6 +60,14 @@
 - 容器：重建 `lipanel:local` 并 `docker compose up -d` 后 health 返回 `{"status":"ok"}`，`docker stats` 实测 45.73MiB / CPU 0.23% / 2 进程
 - 视觉对照：四档响应式与对比度建议在浏览器中人工复核
 
+2026-08-21 前端显示优化实测（`codex/frontend-display`）：
+
+- 面板问候 + 日期/时间小组件：`DateTimeWidget` 本地时区秒级更新，登录显示「晚上好，用户名」，访客显示通用问候；移动端 375px 不溢出（路线图 V24 时钟、V25 问候前端部分）
+- 快捷方式卡片长标题两行显示：`line-clamp-2` + `title` 悬停提示，长名称不再单行截断
+- 面板分区标题显示数量：分组/未分组/最近使用标题后显示链接数
+- 设置页表格窄屏优化：名称列 `min-w` 保证可读，移动端 `overflow-x-auto` 横向滚动；操作列 `whitespace-nowrap` 防换行
+- 验证：`npx tsc --noEmit && npx vite build` 通过；后端 pytest 35 passed（无后端改动）；Playwright 实测时钟每秒跳动、长标题两行完整显示、四档视口无横向溢出、无断图、对比度无低值
+
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 
 - 后端：pytest 35 passed（认证/SSO/可见性/隔离/站点设置）
