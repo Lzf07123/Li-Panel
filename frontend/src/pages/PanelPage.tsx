@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { authApi, panelApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
+import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
 import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
@@ -36,6 +37,9 @@ export function PanelPage() {
   const [recents, setRecents] = useState<RecentItem[]>(getRecent);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [previewLink, setPreviewLink] = useState<LinkOut | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(
+    loadCollapsedGroups,
+  );
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -70,6 +74,9 @@ export function PanelPage() {
     (link) =>
       matches(link, query) && (tagFilter === null || link.tags.includes(tagFilter)),
   );
+  const searching = Boolean(query.trim()) || tagFilter !== null;
+  const isGroupCollapsed = (groupId: number) =>
+    !searching && collapsedGroups.has(groupId);
   const allTags = useMemo(() => {
     const links = [
       ...(panel?.groups ?? []).flatMap((group) => group.links),
@@ -95,6 +102,7 @@ export function PanelPage() {
   const flatLinks = useMemo(() => {
     const items: { link: LinkOut; id: string }[] = [];
     for (const group of groups) {
+      if (isGroupCollapsed(group.id)) continue;
       for (const link of group.links) {
         items.push({ link, id: `panel-link-${items.length}` });
       }
@@ -103,7 +111,7 @@ export function PanelPage() {
       items.push({ link, id: `panel-link-${items.length}` });
     }
     return items;
-  }, [groups, ungrouped]);
+  }, [groups, ungrouped, collapsedGroups, searching]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -358,23 +366,50 @@ export function PanelPage() {
           {groups.map((group) =>
             group.links.length === 0 ? null : (
               <section key={group.id} className="mb-8">
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
+                <button
+                  type="button"
+                  aria-expanded={!isGroupCollapsed(group.id)}
+                  className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted transition-colors hover:text-foreground"
+                  onClick={() =>
+                    setCollapsedGroups((current) =>
+                      toggleCollapsedGroup(current, group.id),
+                    )
+                  }
+                >
                   <span className="h-px w-4 bg-border" />
                   {group.name}
-                </h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {group.links.map((link) => (
-                    <LinkCard
-                      key={link.id}
-                      link={link}
-                      onActivate={(activated) => setRecents(recordRecent(activated))}
-                      onOpenModal={setPreviewLink}
-                      listIndex={flatLinks.findIndex(
-                        (item) => item.link.id === link.id,
-                      )}
-                    />
-                  ))}
-                </div>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className={`h-3.5 w-3.5 transition-transform ${
+                      isGroupCollapsed(group.id) ? "-rotate-90" : ""
+                    }`}
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                {!isGroupCollapsed(group.id) ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {group.links.map((link) => (
+                      <LinkCard
+                        key={link.id}
+                        link={link}
+                        onActivate={(activated) =>
+                          setRecents(recordRecent(activated))
+                        }
+                        onOpenModal={setPreviewLink}
+                        listIndex={flatLinks.findIndex(
+                          (item) => item.link.id === link.id,
+                        )}
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </section>
             ),
           )}
