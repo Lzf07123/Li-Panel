@@ -330,6 +330,25 @@ export function SettingsPage() {
     toast.success(t("标签「{name}」已删除", { name: deleteTagName }));
   }, { onError: (err) => setError(err.message) });
 
+  const fetchMissingIconsAction = useAsyncAction(async () => {
+    const missing = links.filter(
+      (link) => link.icon_type === "letter" || !link.icon_value,
+    );
+    let ok = 0;
+    for (const link of missing) {
+      try {
+        await linksApi.fetchIcon(link.id);
+        ok += 1;
+      } catch {
+        /* 单个失败忽略，继续下一个 */
+      }
+    }
+    setLinks(await linksApi.list());
+    toast.success(
+      t("已获取 {n}/{total} 个图标", { n: ok, total: missing.length }),
+    );
+  }, { onError: (err) => setError(err.message) });
+
   const batchDeleteAction = useAsyncAction(async () => {
     const count = selectedIds.size;
     await linksApi.batchDelete([...selectedIds]);
@@ -393,6 +412,10 @@ export function SettingsPage() {
     setDuplicateNotice(null);
     setLinks(await linksApi.list());
     toast.success(t("快捷方式已保存"));
+    // 自动抓取图标为后台任务，稍后刷新以显示新图标
+    window.setTimeout(() => {
+      void linksApi.list().then(setLinks).catch(() => undefined);
+    }, 8000);
   }, {
     onError: (err) => {
       const e = err as Error & { code?: string };
@@ -1093,9 +1116,19 @@ export function SettingsPage() {
                 ) : null}
 
                 <div className="card p-6">
-                  <h2 className="mb-3 text-sm font-semibold text-foreground">
-                    {t("快捷方式")}（{links.length}）
-                  </h2>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-foreground">
+                      {t("快捷方式")}（{links.length}）
+                    </h2>
+                    <button
+                      type="button"
+                      className="btn btn-ghost h-8 px-3 text-xs"
+                      disabled={fetchMissingIconsAction.status === "pending"}
+                      onClick={() => void fetchMissingIconsAction.run()}
+                    >
+                      {t("补抓缺失图标")}
+                    </button>
+                  </div>
                   <div className="table-shell overflow-x-auto">
                     <table>
                       <thead>

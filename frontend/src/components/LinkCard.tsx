@@ -111,49 +111,83 @@ export function LinkCard({
         ) : null}
       </span>
       {status ? (
-        <span
-          role="button"
-          tabIndex={-1}
-          aria-label={
-            status === "up"
-              ? t("在线")
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          <span
+            role="button"
+            tabIndex={-1}
+            aria-label={
+              status === "up"
+                ? t("在线")
+                : status === "down"
+                  ? t("离线")
+                  : t("状态未知")
+            }
+            title={
+              status === "up"
+                ? t("在线 · {ms}ms", { ms: statusMs ?? "" }) +
+                  t("（点击查看趋势）")
+                : status === "down"
+                  ? t("离线") + t("（点击查看趋势）")
+                  : t("状态未知")
+            }
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onStatusClick?.(link);
+            }}
+            className={`status-dot shrink-0 ${
+              status === "up"
+                ? "status-dot-up"
+                : status === "down"
+                  ? "status-dot-down"
+                  : ""
+            }`}
+          />
+          <span
+            className={`min-w-14 text-right text-xs tabular-nums leading-none ${
+              status === "up"
+                ? "text-success"
+                : status === "down"
+                  ? "text-destructive"
+                  : "text-muted"
+            }`}
+            aria-hidden="true"
+          >
+            {status === "up"
+              ? statusMs != null
+                ? `${statusMs}ms`
+                : t("在线")
               : status === "down"
                 ? t("离线")
-                : t("状态未知")
-          }
-          title={
-            status === "up"
-              ? t("在线 · {ms}ms", { ms: statusMs ?? "" }) + t("（点击查看趋势）")
-              : status === "down"
-                ? t("离线") + t("（点击查看趋势）")
-                : t("状态未知")
-          }
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onStatusClick?.(link);
-          }}
-          className={`status-dot shrink-0 ${
-            status === "up"
-              ? "status-dot-up"
-              : status === "down"
-                ? "status-dot-down"
-                : ""
-          }`}
-        />
-      ) : null}
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-        className="ml-auto h-4 w-4 shrink-0 text-muted"
-      >
-        <path d="M7 17 17 7M8 7h9v9" />
-      </svg>
+                : "—"}
+          </span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-muted"
+          >
+            <path d="M7 17 17 7M8 7h9v9" />
+          </svg>
+        </span>
+      ) : (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="ml-auto h-4 w-4 shrink-0 text-muted"
+        >
+          <path d="M7 17 17 7M8 7h9v9" />
+        </svg>
+      )}
     </a>
   );
 }
