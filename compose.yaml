@@ -4,16 +4,22 @@ services:
       context: .
       args:
         IMAGE_REGISTRY: ${IMAGE_REGISTRY:-docker.io/library}
-        PANEL_PORT: ${PANEL_PORT:-8000}
         APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+        VITE_APP_NAME: ${VITE_APP_NAME:-}
+        VITE_APP_TAGLINE: ${VITE_APP_TAGLINE:-}
+        VITE_ICP_FILING_TEXT: ${VITE_ICP_FILING_TEXT:-}
+        VITE_ICP_FILING_URL: ${VITE_ICP_FILING_URL:-}
+        VITE_ICP_FILING_ICON: ${VITE_ICP_FILING_ICON:-}
+        VITE_POLICE_FILING_TEXT: ${VITE_POLICE_FILING_TEXT:-}
+        VITE_POLICE_FILING_URL: ${VITE_POLICE_FILING_URL:-}
+        VITE_POLICE_FILING_ICON: ${VITE_POLICE_FILING_ICON:-}
     image: lipanel:local
     container_name: lipanel
-    # 后端端口不直接暴露主机，由下方 nginx 反代统一对外（隐藏真实端口）
+    # 后端固定监听容器内 8000，不直接暴露主机；对外统一由 nginx 反代（隐藏真实端口）
     environment:
       PANEL_DATA_DIR: /app/data
-      PANEL_PORT: ${PANEL_PORT:-8000}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PANEL_SECRET_KEY: ${PANEL_SECRET_KEY:?请在 .env 中设置 PANEL_SECRET_KEY}
       PANEL_PUBLIC_MODE: ${PANEL_PUBLIC_MODE:-true}
@@ -24,6 +30,15 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      PANEL_LINK_ICON_FETCH: ${PANEL_LINK_ICON_FETCH:-true}
+      PANEL_BACKUP_KEEP: ${PANEL_BACKUP_KEEP:-10}
+      PANEL_HEALTH_CHECK: ${PANEL_HEALTH_CHECK:-true}
+      PANEL_SSO_LOGOUT_REDIRECTS: ${PANEL_SSO_LOGOUT_REDIRECTS:-}
+      PANEL_ALLOWED_HOSTS: ${PANEL_ALLOWED_HOSTS:-}
+      PANEL_LOGIN_MAX_FAILS: ${PANEL_LOGIN_MAX_FAILS:-5}
+      PANEL_LOGIN_LOCK_MINUTES: ${PANEL_LOGIN_LOCK_MINUTES:-15}
+      PANEL_HSTS: ${PANEL_HSTS:-false}
+      PANEL_HOST_COOKIE: ${PANEL_HOST_COOKIE:-false}
     volumes:
       - ./data:/app/data
     restart: unless-stopped

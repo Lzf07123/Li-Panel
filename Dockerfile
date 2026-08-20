@@ -1,12 +1,29 @@
 ARG IMAGE_REGISTRY=docker.io/library
-ARG PANEL_PORT=8000
 
 # ---------- 前端构建阶段 ----------
 FROM ${IMAGE_REGISTRY}/node:22-alpine AS frontend
 ARG NPM_REGISTRY=https://registry.npmjs.org
+# 品牌/备案构建期默认值（运行时以后台 site_settings 为准；未设置时回退 brand.ts 默认）
+ARG VITE_APP_NAME=
+ARG VITE_APP_TAGLINE=
+ARG VITE_ICP_FILING_TEXT=
+ARG VITE_ICP_FILING_URL=
+ARG VITE_ICP_FILING_ICON=
+ARG VITE_POLICE_FILING_TEXT=
+ARG VITE_POLICE_FILING_URL=
+ARG VITE_POLICE_FILING_ICON=
+ENV VITE_APP_NAME=${VITE_APP_NAME} \
+    VITE_APP_TAGLINE=${VITE_APP_TAGLINE} \
+    VITE_ICP_FILING_TEXT=${VITE_ICP_FILING_TEXT} \
+    VITE_ICP_FILING_URL=${VITE_ICP_FILING_URL} \
+    VITE_ICP_FILING_ICON=${VITE_ICP_FILING_ICON} \
+    VITE_POLICE_FILING_TEXT=${VITE_POLICE_FILING_TEXT} \
+    VITE_POLICE_FILING_URL=${VITE_POLICE_FILING_URL} \
+    VITE_POLICE_FILING_ICON=${VITE_POLICE_FILING_ICON}
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm config set registry ${NPM_REGISTRY} && npm ci
+# --registry 命令行参数优先级最高，覆盖仓库内 frontend/.npmrc，确保 NPM_REGISTRY 真正生效
+RUN npm ci --registry=${NPM_REGISTRY}
 COPY frontend/ ./
 RUN npm run build
 
@@ -19,7 +36,8 @@ ENV UV_INDEX_URL=${PIP_INDEX_URL}
 ENV PYTHONUNBUFFERED=1
 ENV MALLOC_ARENA_MAX=2
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PANEL_PORT=${PANEL_PORT}
+# 后端固定监听容器内 8000；对外端口由 nginx 服务映射（compose PANEL_PORT）
+ENV PANEL_PORT=8000
 
 WORKDIR /app
 
@@ -43,9 +61,9 @@ RUN useradd --uid 10001 --create-home appuser && \
     chown -R appuser:appuser /app/data
 
 USER appuser
-EXPOSE ${PANEL_PORT}
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -fsS "http://localhost:${PANEL_PORT}/api/health" || exit 1
+  CMD curl -fsS "http://localhost:8000/api/health" || exit 1
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port \"${PANEL_PORT:-8000}\" --workers 1"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
