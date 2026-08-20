@@ -29,6 +29,8 @@ SITE_KEYS = {
     "footer_text",
     "icp",
     "public_mode",
+    "notify_url",
+    "notify_enabled",
 }
 
 USER_KEYS = {"theme", "link_mode"}
@@ -45,6 +47,8 @@ class SiteSettingsIn(BaseModel):
     footer_text: str | None = Field(default=None, max_length=200)
     icp: str | None = Field(default=None, max_length=100)
     public_mode: bool | None = None
+    notify_url: str | None = Field(default=None, max_length=500)
+    notify_enabled: bool | None = None
 
 
 @router.get("/api/site-settings")
@@ -64,6 +68,10 @@ def site_settings_put(
     for key, value in payload.items():
         if key == "public_mode":
             value = "true" if value else "false"
+        if key == "notify_enabled":
+            value = "true" if value else "false"
+        if key == "notify_url" and value and not value.startswith(("http://", "https://")):
+            raise HTTPException(status_code=422, detail="通知地址必须以 http(s):// 开头")
         conn.execute(
             "INSERT INTO site_settings (key, value, updated_at) VALUES (?, ?, datetime('now')) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",

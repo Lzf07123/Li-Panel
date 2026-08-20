@@ -256,3 +256,111 @@ def test_public_status_respects_public_mode(client, auth_headers, health_server,
     )
     c = TestClient(app)
     assert c.get("/api/health/status").status_code == 401
+
+
+class _NotifyHandler(BaseHTTPRequestHandler):
+    posts: list[dict] = []
+
+    def do_POST(self):  # noqa: N802
+        length = int(self.headers.get("Content-Length", "0"))
+        import json as _json
+
+        body = _json.loads(self.rfile.read(length) or b"{}")
+        _NotifyHandler.posts.append(body)
+        self.send_response(200)
+        self.end_headers()
+
+    def do_GET(self):  # noqa: N802
+        self._reply()
+
+    def _reply(self):
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *args):  # noqa: D102
+        pass
+
+
+@pytest.fixture
+def notify_server():
+    _NotifyHandler.posts = []
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _NotifyHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}/notify"
+    server.shutdown()
+
+
+def _set_notify(client, auth_headers, url, enabled=True):
+    r = client.put(
+        "/api/site-settings",
+        json={"notify_url": url, "notify_enabled": enabled},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+
+
+def test_notify_on_status_change(client, auth_headers, health_server, notify_server):
+    from app import health as health_module
+    from app.db import connect
+    from datetime import datetime, timedelta, timezone
+
+    _set_notify(client, auth_headers, notify_server)
+    lid = client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    ).json()["id"]
+    client.get("/api/health/links", headers=auth_headers)
+    assert len(_NotifyHandler.posts) == 1  # 首次采样视为状态变化
+
+    def _reset_history(status):
+        conn = connect(client.app.state.db_path)
+        conn.execute("DELETE FROM link_health WHERE link_id = ?", (lid,))
+        conn.execute(
+            "INSERT INTO link_health (link_id, user_id, status, ms, checked_at) "
+            "VALUES (?, 1, ?, 0, ?)",
+            (lid, status, (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        conn.commit()
+        conn.close()
+
+    # 同状态再次采样（绕过 10 分钟间隔与缓存）→ 不通知
+    _reset_history("up")
+    with health_module._cache_lock:
+        health_module._cache.clear()
+    client.get("/api/health/links", headers=auth_headers)
+    assert len(_NotifyHandler.posts) == 1
+
+    # 状态变化 → 通知
+    REQUESTS["mode"] = "error"
+    _reset_history("up")
+    with health_module._cache_lock:
+        health_module._cache.clear()
+    client.get("/api/health/links", headers=auth_headers)
+    assert len(_NotifyHandler.posts) == 2
+    assert _NotifyHandler.posts[-1]["status"] == "down"
+    assert _NotifyHandler.posts[-1]["previous_status"] == "up"
+
+
+def test_notify_disabled(client, auth_headers, health_server, notify_server):
+    _set_notify(client, auth_headers, notify_server, enabled=False)
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    client.get("/api/health/links", headers=auth_headers)
+    assert _NotifyHandler.posts == []
+
+
+def test_notify_failure_ignored(client, auth_headers, health_server):
+    _set_notify(client, auth_headers, "http://127.0.0.1:1/nope")
+    client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server},
+        headers=auth_headers,
+    )
+    r = client.get("/api/health/links", headers=auth_headers)
+    assert r.status_code == 200

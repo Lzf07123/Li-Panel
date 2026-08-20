@@ -11,6 +11,8 @@ SITE_DEFAULTS: dict[str, str] = {
     "footer_text": "© 2026",
     "icp": "",
     "public_mode": "true",
+    "notify_url": "",
+    "notify_enabled": "false",
 }
 
 

@@ -465,6 +465,8 @@ export function SettingsPage() {
                     footer_text: site.footer_text,
                     icp: site.icp,
                     public_mode: site.public_mode === "true",
+                    notify_url: site.notify_url,
+                    notify_enabled: site.notify_enabled === "true",
                   });
                 }}
                 className="card space-y-4 p-6 sm:p-8"
@@ -559,6 +561,37 @@ export function SettingsPage() {
                       value={site.icp}
                       onChange={(e) => setSite({ ...site, icp: e.target.value })}
                     />
+                  </label>
+                </div>
+                <div className="rounded-xl bg-surface-2/60 p-4">
+                  <p className="text-sm font-medium text-foreground">通知设置</p>
+                  <p className="mt-1 text-xs text-muted">
+                    链接状态变化时向 ntfy / Webhook 地址发送 JSON 通知。
+                  </p>
+                  <label className="mt-3 block">
+                    <span className="label">通知地址（ntfy / Webhook）</span>
+                    <input
+                      className="input"
+                      value={site.notify_url}
+                      onChange={(e) =>
+                        setSite({ ...site, notify_url: e.target.value })
+                      }
+                      placeholder="https://ntfy.sh/your-topic 或 https://example.com/hook"
+                    />
+                  </label>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={site.notify_enabled === "true"}
+                      onChange={(e) =>
+                        setSite({
+                          ...site,
+                          notify_enabled: e.target.checked ? "true" : "false",
+                        })
+                      }
+                    />
+                    启用状态变化通知
                   </label>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">

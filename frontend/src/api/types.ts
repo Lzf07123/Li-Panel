@@ -22,6 +22,8 @@ export interface SiteSettings {
   footer_text: string;
   icp: string;
   public_mode: string;
+  notify_url: string;
+  notify_enabled: string;
   oidc_enabled?: boolean;
 }
 

@@ -10,6 +10,7 @@ from app.brand_defaults import get_site_settings
 from app.db import get_db
 from app.deps import current_user
 from app.health import check_url, get_cached, set_cached
+from app.notify import send_notification
 
 router = APIRouter(prefix="/api/health", tags=["health"])
 
@@ -77,10 +78,11 @@ def health_links(
     if not settings.health_check:
         return {"enabled": False, "results": []}
     links = conn.execute(
-        "SELECT id, url_lan, url_wan FROM links WHERE user_id = ?", (user["id"],)
+        "SELECT id, name, url_lan, url_wan FROM links WHERE user_id = ?",
+        (user["id"],),
     ).fetchall()
     results = _check_many(links)
-    _record_samples(conn, user["id"], results)
+    _record_samples(conn, user["id"], results, links)
     return {"enabled": True, "results": results}
 
 
@@ -103,15 +105,29 @@ def public_status(
 
 
 def _record_samples(
-    conn: sqlite3.Connection, user_id: int, results: list[dict]
+    conn: sqlite3.Connection,
+    user_id: int,
+    results: list[dict],
+    links: list[sqlite3.Row] | None = None,
 ) -> None:
-    """V23：每链接 ≥10 分钟采样一次写入 link_health，超 144 条滚动清理。"""
+    """V23：每链接 ≥10 分钟采样一次写入 link_health，超 144 条滚动清理。
+
+    V28：状态相对上次采样发生变化时发通知（ntfy/Webhook，URL 存 site_settings）。
+    """
+    names = {row["id"]: row["name"] for row in links or []}
+    notify_row = conn.execute(
+        "SELECT key, value FROM site_settings WHERE key IN ('notify_url', 'notify_enabled')"
+    ).fetchall()
+    notify_config = {row["key"]: row["value"] for row in notify_row}
+    notify_url = notify_config.get("notify_url", "")
+    notify_enabled = notify_config.get("notify_enabled", "false") == "true"
+
     now = _now_utc()
     fmt = now.strftime("%Y-%m-%d %H:%M:%S")
     for item in results:
         link_id = item["link_id"]
         last = conn.execute(
-            "SELECT checked_at FROM link_health WHERE link_id = ? "
+            "SELECT checked_at, status FROM link_health WHERE link_id = ? "
             "ORDER BY checked_at DESC LIMIT 1",
             (link_id,),
         ).fetchone()
@@ -126,6 +142,7 @@ def _record_samples(
                 minutes=SAMPLE_INTERVAL_MINUTES
             ):
                 continue
+        prev_status = last["status"] if last is not None else None
         conn.execute(
             "DELETE FROM link_health WHERE link_id = ? AND id NOT IN ("
             "SELECT id FROM link_health WHERE link_id = ? "
@@ -137,6 +154,23 @@ def _record_samples(
             "VALUES (?, ?, ?, ?, ?)",
             (link_id, user_id, item["status"], item["ms"], fmt),
         )
+        if (
+            notify_enabled
+            and notify_url
+            and prev_status != item["status"]
+        ):
+            send_notification(
+                notify_url,
+                {
+                    "event": "link_status_changed",
+                    "link_id": link_id,
+                    "name": names.get(link_id, ""),
+                    "status": item["status"],
+                    "previous_status": prev_status,
+                    "ms": item["ms"],
+                    "checked_at": fmt,
+                },
+            )
     cutoff = (now - timedelta(hours=HISTORY_HOURS)).strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
         "DELETE FROM link_health WHERE user_id = ? AND checked_at < ?",
