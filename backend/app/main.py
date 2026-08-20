@@ -33,9 +33,9 @@ def _build_csp(settings: Settings) -> str:
     )
     return (
         f"default-src 'self'; connect-src 'self'; "
-        f"img-src 'self' data:; style-src {style_src}; object-src 'none'; "
-        f"base-uri 'self'; form-action 'self'; frame-src 'self' https: http:; "
-        f"frame-ancestors 'none'"
+        f"img-src 'self' data:; style-src {style_src}; font-src 'self' data:; "
+        f"object-src 'none'; base-uri 'self'; form-action 'self'; "
+        f"frame-src 'self' https: http:; frame-ancestors 'none'"
     )
 
 
@@ -94,6 +94,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["content-security-policy"] = csp
         response.headers["x-content-type-options"] = "nosniff"
         response.headers["referrer-policy"] = "no-referrer"
+        response.headers["cross-origin-opener-policy"] = "same-origin"
+        response.headers["cross-origin-resource-policy"] = "same-origin"
+        response.headers["permissions-policy"] = (
+            "camera=(), microphone=(), geolocation=(), usb=()"
+        )
+        if settings.hsts:
+            response.headers["strict-transport-security"] = (
+                "max-age=63072000; includeSubDomains"
+            )
         if request.url.path.startswith(("/api/", "/auth/")):
             response.headers["cache-control"] = "no-store"
         return response

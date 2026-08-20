@@ -167,5 +167,6 @@
 - ✅ V36（角色与权限）：2026-08-21 完成。`site_settings` 写接口仅 admin（403），读保持公开；前端按角色隐藏「站点信息」标签页（非 admin 自动切到管理页）。pytest 133 passed。
 - ✅ V37（会话管理）：2026-08-21 完成。`GET/DELETE /api/sessions`（本人会话列表含 current 标记；单点吊销、当前会话拒绝 400、跨用户 404、吊销其他全部）；个人设置页会话管理卡片。pytest 138 passed。
 - ✅ V38（审计日志）：2026-08-21 完成。`audit_logs` 表（登录/登出/SSO 登录/绑定/解绑/备份导入恢复/站点设置变更），滚动保留 1000 条；`GET /api/audit-logs` 仅 admin。pytest 142 passed。
-- ⬜ V39–V40：待执行。
+- ✅ V39（安全响应头补全）：2026-08-21 完成。CSP `font-src 'self' data:`；`COOP: same-origin`、`CORP: same-origin`、`Permissions-Policy`、HSTS（`PANEL_HSTS`，默认关）。pytest 144 passed。
+- ⬜ V40：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

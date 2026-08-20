@@ -42,6 +42,7 @@ class Settings:
     allowed_hosts: tuple[str, ...]
     login_max_fails: int
     login_lock_minutes: int
+    hsts: bool
 
     @property
     def db_path(self) -> Path:
@@ -115,4 +116,5 @@ def load_settings(overrides: dict | None = None) -> Settings:
         login_lock_minutes=int(o["login_lock_minutes"])
         if "login_lock_minutes" in o
         else _env_int("PANEL_LOGIN_LOCK_MINUTES", 15),
+        hsts=flag("hsts", "PANEL_HSTS", False),
     )
