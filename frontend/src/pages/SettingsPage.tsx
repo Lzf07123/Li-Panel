@@ -1404,7 +1404,7 @@ export function SettingsPage() {
             ) : null}
 
             {tab === "personal" ? (
-              <div className="card max-w-lg space-y-5 p-6">
+              <div className="card mx-auto max-w-lg space-y-5 p-6">
                 <div>
                   <span className="label">{t("语言")}</span>
                   <select
@@ -1487,7 +1487,7 @@ export function SettingsPage() {
                           ) : (
                             <button
                               type="button"
-                              className="btn btn-danger ml-auto h-7 shrink-0 px-2 text-xs"
+                              className="btn btn-danger ml-auto h-8 shrink-0 px-2 text-xs"
                               disabled={revokeSessionAction.status === "pending"}
                               onClick={() => void revokeSessionAction.run(session.id)}
                             >
@@ -1518,7 +1518,7 @@ export function SettingsPage() {
                     {rssUrls.map((url, index) => (
                       <input
                         key={index}
-                        className="input input-sm"
+                        className="input"
                         placeholder={t("订阅源 {n}（可选）", { n: index + 1 })}
                         value={url}
                         onChange={(e) =>
@@ -1587,7 +1587,7 @@ export function SettingsPage() {
                             </span>
                             <button
                               type="button"
-                              className="btn btn-ghost ml-auto h-7 shrink-0 px-2 text-xs"
+                              className="btn btn-ghost ml-auto h-8 shrink-0 px-2 text-xs"
                               onClick={() => setRestoreName(snap.name)}
                             >
                               {t("恢复")}
