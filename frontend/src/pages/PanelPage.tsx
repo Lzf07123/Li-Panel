@@ -129,6 +129,25 @@ export function PanelPage() {
       .map((item) => byId.get(item.id))
       .filter((link): link is LinkOut => Boolean(link));
   }, [recents, allLinks]);
+  // V25：今天打开过的快捷方式（无则回退最近使用）
+  const todayLinks = useMemo(() => {
+    const now = new Date();
+    const isToday = (ts: number) => {
+      const d = new Date(ts);
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    };
+    const todayItems = recents.filter((item) => isToday(item.opened_at));
+    const items = todayItems.length > 0 ? todayItems : recents;
+    const byId = new Map(allLinks.map((link) => [link.id, link]));
+    return items
+      .map((item) => byId.get(item.id))
+      .filter((link): link is LinkOut => Boolean(link))
+      .slice(0, 6);
+  }, [recents, allLinks]);
   const flatLinks = useMemo(() => {
     const items: { link: LinkOut; id: string }[] = [];
     for (const group of groups) {
@@ -324,6 +343,38 @@ export function PanelPage() {
                   ? `找到 ${total} 个结果`
                   : `共 ${total} 个快捷方式`}
               </span>
+              {me && !query.trim() && todayLinks.length > 0 ? (
+                <div
+                  className="mt-2 flex max-w-2xl flex-wrap items-center justify-center gap-2"
+                  aria-label="今天常用"
+                >
+                  {todayLinks.map((link) => {
+                    const href = link.url ? link.url : `/go/${link.id}`;
+                    return (
+                      <a
+                        key={link.id}
+                        href={href}
+                        target={link.open_mode === "new_tab" ? "_blank" : undefined}
+                        rel={
+                          link.open_mode === "new_tab" ? "noreferrer" : undefined
+                        }
+                        title={link.description || link.name}
+                        className="badge badge-muted cursor-pointer border transition-colors hover:border-primary hover:text-primary"
+                        onClick={(event) => {
+                          const next = recordRecent(link);
+                          setRecents(next);
+                          if (link.open_mode === "modal") {
+                            event.preventDefault();
+                            setPreviewLink(link);
+                          }
+                        }}
+                      >
+                        {link.name}
+                      </a>
+                    );
+                  })}
+                </div>
+              ) : null}
             </section>
           ) : null}
 

@@ -151,5 +151,7 @@
 - ✅ V21（链接健康检查引擎）：2026-08-21 完成。`GET /api/health/links` 受控检查（`PANEL_HEALTH_CHECK` 开关、HEAD 优先 405/501 回退 GET、5s 超时、并发 ≤4、60s 缓存、<500 视为 up）；仅本人链接。pytest 89 passed（本地 fixture：up/down/缓存/关闭/隔离）。
 - ✅ V22（卡片状态点）：2026-08-21 完成。面板卡片状态点（up 绿 / down 红 / unknown 灰），hover 显示响应毫秒；健康检查并发化（ThreadPoolExecutor≤4）；SQLite `busy_timeout=10s` 硬化。pytest 89 passed；Playwright 端到端：44 个链接状态点全部渲染（在线/离线）。
 - ✅ V23（状态历史）：2026-08-21 完成。`link_health` 表（10 分钟采样、24h/144 条滚动清理）+ `GET /api/health/links/{id}/history`；卡片状态点点击弹趋势条（绿/红 + 图例）。pytest 93 passed；Playwright 端到端：点状态点弹出历史弹层。
-- ⬜ V24–V30：待执行（V24 时钟小组件已在显示优化分支先行完成，本次回填验收状态）。
+- ✅ V24（时钟小组件）：2026-08-21 完成（前端显示优化分支 `codex/frontend-display` 先行落地，`DateTimeWidget` 本地时区秒级更新，375px 不溢出；此处回填验收状态）。
+- ✅ V25（问候与快捷入口）：2026-08-21 完成。问候语（早晚/午/夜，登录显示用户名）+ 「今天」常用入口（当天打开的快捷方式 chips，无当天记录回退最近使用）。Playwright 端到端：chips 渲染。
+- ⬜ V26–V30：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。
