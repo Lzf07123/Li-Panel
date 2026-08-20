@@ -86,6 +86,10 @@ CREATE TABLE IF NOT EXISTS links (
     guest_url_mode TEXT NOT NULL DEFAULT 'hidden',
     sort_order INTEGER NOT NULL DEFAULT 0,
     open_mode TEXT NOT NULL DEFAULT 'new_tab',
+    health_enabled INTEGER NOT NULL DEFAULT 1,
+    health_interval INTEGER NOT NULL DEFAULT 10,
+    health_timeout REAL NOT NULL DEFAULT 5.0,
+    health_threshold INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_links_user ON links(user_id);
@@ -131,8 +135,21 @@ def connect(path: Path) -> sqlite3.Connection:
     return conn
 
 
+_LINK_HEALTH_MIGRATIONS = [
+    "ALTER TABLE links ADD COLUMN health_enabled INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE links ADD COLUMN health_interval INTEGER NOT NULL DEFAULT 10",
+    "ALTER TABLE links ADD COLUMN health_timeout REAL NOT NULL DEFAULT 5.0",
+    "ALTER TABLE links ADD COLUMN health_threshold INTEGER NOT NULL DEFAULT 1",
+]
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    for statement in _LINK_HEALTH_MIGRATIONS:
+        try:
+            conn.execute(statement)
+        except sqlite3.OperationalError:
+            pass  # 已存在该列
     conn.commit()
 
 

@@ -36,6 +36,10 @@ const emptyLinkForm = {
   guest_url_mode: "hidden" as "hidden" | "show",
   open_mode: "new_tab" as "new_tab" | "modal",
   tags: [] as string[],
+  health_enabled: true,
+  health_interval: 10,
+  health_timeout: 5,
+  health_threshold: 1,
 };
 
 export function SettingsPage() {
@@ -319,6 +323,10 @@ export function SettingsPage() {
       guest_url_mode: linkForm.guest_url_mode,
       open_mode: linkForm.open_mode,
       tags: linkForm.tags,
+      health_enabled: linkForm.health_enabled,
+      health_interval: linkForm.health_interval,
+      health_timeout: linkForm.health_timeout,
+      health_threshold: linkForm.health_threshold,
       force,
     };
     if (linkForm.id === null) {
@@ -888,6 +896,74 @@ export function SettingsPage() {
                     <option value="new_tab">新标签页打开</option>
                     <option value="modal">内置窗口打开</option>
                   </select>
+                  <div className="rounded-xl border border-border bg-surface-2/40 p-3 sm:col-span-2">
+                    <p className="text-sm font-medium text-foreground">健康检查</p>
+                    <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-primary"
+                        checked={linkForm.health_enabled}
+                        onChange={(e) =>
+                          setLinkForm({
+                            ...linkForm,
+                            health_enabled: e.target.checked,
+                          })
+                        }
+                      />
+                      启用健康检查
+                    </label>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      <label className="block">
+                        <span className="label">间隔（分钟）</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={1440}
+                          className="input"
+                          value={linkForm.health_interval}
+                          onChange={(e) =>
+                            setLinkForm({
+                              ...linkForm,
+                              health_interval: Number(e.target.value) || 10,
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="label">超时（秒）</span>
+                        <input
+                          type="number"
+                          min={0.5}
+                          max={30}
+                          step={0.5}
+                          className="input"
+                          value={linkForm.health_timeout}
+                          onChange={(e) =>
+                            setLinkForm({
+                              ...linkForm,
+                              health_timeout: Number(e.target.value) || 5,
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="label">连续失败阈值</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          className="input"
+                          value={linkForm.health_threshold}
+                          onChange={(e) =>
+                            setLinkForm({
+                              ...linkForm,
+                              health_threshold: Number(e.target.value) || 1,
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
                   {duplicateNotice ? (
                     <div className="sm:col-span-2">
                       <Notice intent="warning">{duplicateNotice}</Notice>
@@ -1066,6 +1142,10 @@ export function SettingsPage() {
                                       guest_url_mode: link.guest_url_mode,
                                       open_mode: link.open_mode,
                                       tags: link.tags,
+                                      health_enabled: link.health_enabled,
+                                      health_interval: link.health_interval,
+                                      health_timeout: link.health_timeout,
+                                      health_threshold: link.health_threshold,
                                     });
                                     setDuplicateNotice(null);
                                   }}

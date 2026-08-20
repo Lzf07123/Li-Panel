@@ -98,8 +98,9 @@ def _apply_backup(
             mapped = group_id_map.get(group_id)
         conn.execute(
             "INSERT INTO links (user_id, group_id, name, url_lan, url_wan, icon_type, "
-            "icon_value, description, tags, is_public, guest_url_mode, sort_order, open_mode) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "icon_value, description, tags, is_public, guest_url_mode, sort_order, open_mode, "
+            "health_enabled, health_interval, health_timeout, health_threshold) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user["id"],
                 mapped,
@@ -114,6 +115,10 @@ def _apply_backup(
                 link.get("guest_url_mode", "hidden"),
                 max_link_sort + 1 + index,
                 link.get("open_mode", "new_tab"),
+                int(bool(link.get("health_enabled", True))),
+                int(link.get("health_interval", 10)),
+                float(link.get("health_timeout", 5.0)),
+                int(link.get("health_threshold", 1)),
             ),
         )
         imported_links += 1

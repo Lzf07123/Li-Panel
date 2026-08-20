@@ -88,6 +88,7 @@
 - V26 RSS/ATOM 小组件：`app/rss.py`（≤3 源、8s 超时、并发 ≤3、10min 缓存、标准库 XML）；`rss_feeds` 用户设置（校验/上限）；`GET /api/rss`；个人设置页订阅管理、面板「订阅」折叠卡片；SQLite 改自动提交（`isolation_level=None`）+ `busy_timeout` 根治锁冲突；pytest 98 passed，Playwright 端到端通过
 - V27 公开状态页：`GET /api/health/status`（无鉴权但遵循 public_mode，仅 is_public 链接、健康检查复用并发/缓存）；访客面板状态点；pytest 100 passed，Playwright 访客 28 个公开链接状态点通过
 - V28 通知通道：`app/notify.py`（httpx POST 5s 超时、失败静默）；site_settings `notify_url/notify_enabled`（默认空/关，URL 校验）；`_record_samples` 采样时状态变化即通知（首次采样视为变化）；站点信息页通知设置卡片；pytest 103 passed（fixture：变化/同状态/关闭/失败忽略）
+- V29 检测配置中心：links 列 `health_enabled/health_interval/health_timeout/health_threshold`（SCHEMA + ALTER 迁移 + 备份导入携带）；健康引擎按链接配置执行（开关排除、自身间隔/超时、连续失败阈值 `fail_count`）；管理页链接表单健康检查配置组；pytest 106 passed
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

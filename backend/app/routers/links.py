@@ -38,6 +38,10 @@ class LinkIn(BaseModel):
     guest_url_mode: Literal["hidden", "show"] = "hidden"
     sort_order: int = 0
     open_mode: Literal["new_tab", "modal"] = "new_tab"
+    health_enabled: bool = True
+    health_interval: int = Field(default=10, ge=1, le=1440)
+    health_timeout: float = Field(default=5.0, ge=0.5, le=30.0)
+    health_threshold: int = Field(default=1, ge=1, le=10)
     force: bool = False
 
     _url_lan = field_validator("url_lan")(_validate_http_url)
@@ -230,8 +234,9 @@ def create_link(
         _check_duplicate(conn, user["id"], body.name, body.url_lan)
     cur = conn.execute(
         "INSERT INTO links (user_id, group_id, name, url_lan, url_wan, icon_type, "
-        "icon_value, description, tags, is_public, guest_url_mode, sort_order, open_mode) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "icon_value, description, tags, is_public, guest_url_mode, sort_order, open_mode, "
+        "health_enabled, health_interval, health_timeout, health_threshold) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             user["id"],
             body.group_id,
@@ -246,6 +251,10 @@ def create_link(
             body.guest_url_mode,
             body.sort_order,
             body.open_mode,
+            int(body.health_enabled),
+            body.health_interval,
+            body.health_timeout,
+            body.health_threshold,
         ),
     )
     return _link_dict(_owned_link(conn, cur.lastrowid, user["id"]))
@@ -265,7 +274,8 @@ def update_link(
     conn.execute(
         "UPDATE links SET group_id = ?, name = ?, url_lan = ?, url_wan = ?, "
         "icon_type = ?, icon_value = ?, description = ?, tags = ?, is_public = ?, "
-        "guest_url_mode = ?, sort_order = ?, open_mode = ? WHERE id = ?",
+        "guest_url_mode = ?, sort_order = ?, open_mode = ?, health_enabled = ?, "
+        "health_interval = ?, health_timeout = ?, health_threshold = ? WHERE id = ?",
         (
             body.group_id,
             body.name,
@@ -279,6 +289,10 @@ def update_link(
             body.guest_url_mode,
             body.sort_order,
             body.open_mode,
+            int(body.health_enabled),
+            body.health_interval,
+            body.health_timeout,
+            body.health_threshold,
             lid,
         ),
     )

@@ -364,3 +364,85 @@ def test_notify_failure_ignored(client, auth_headers, health_server):
     )
     r = client.get("/api/health/links", headers=auth_headers)
     assert r.status_code == 200
+
+
+def test_health_disabled_link_excluded(client, auth_headers, health_server):
+    client.post(
+        "/api/links",
+        json={"name": "关", "url_lan": health_server, "health_enabled": False},
+        headers=auth_headers,
+    )
+    client.post(
+        "/api/links",
+        json={"name": "开", "url_lan": health_server + "/on"},
+        headers=auth_headers,
+    )
+    r = client.get("/api/health/links", headers=auth_headers).json()
+    links = client.get("/api/links", headers=auth_headers).json()
+    on_id = next(l["id"] for l in links if l["name"] == "开")
+    off_id = next(l["id"] for l in links if l["name"] == "关")
+    ids = [item["link_id"] for item in r["results"]]
+    assert on_id in ids and off_id not in ids
+
+
+def test_health_threshold(client, auth_headers, health_server):
+    from app import health as health_module
+    from app.db import connect
+    from datetime import datetime, timedelta, timezone
+
+    REQUESTS["mode"] = "error"
+    lid = client.post(
+        "/api/links",
+        json={"name": "A", "url_lan": health_server, "health_threshold": 2},
+        headers=auth_headers,
+    ).json()["id"]
+
+    def reset_history():
+        conn = connect(client.app.state.db_path)
+        conn.execute("DELETE FROM link_health WHERE link_id = ?", (lid,))
+        conn.commit()
+        conn.close()
+
+    reset_history()
+    with health_module._cache_lock:
+        health_module._cache.clear()
+    first = client.get("/api/health/links", headers=auth_headers).json()["results"][0]
+    assert first["status"] == "up"  # 第 1 次失败未达阈值
+
+    # 保留 fail_count=1 的旧采样，模拟跨轮次连续失败
+    conn = connect(client.app.state.db_path)
+    conn.execute(
+        "INSERT INTO link_health (link_id, user_id, status, ms, fail_count, checked_at) "
+        "VALUES (?, 1, 'up', 0, 1, ?)",
+        (lid, (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S")),
+    )
+    conn.commit()
+    conn.close()
+    with health_module._cache_lock:
+        health_module._cache.clear()
+    second = client.get("/api/health/links", headers=auth_headers).json()["results"][0]
+    assert second["status"] == "down"  # 连续第 2 次失败达到阈值
+
+
+def test_health_config_roundtrip(client, auth_headers, health_server):
+    r = client.post(
+        "/api/links",
+        json={
+            "name": "A",
+            "url_lan": health_server,
+            "health_interval": 30,
+            "health_timeout": 3.0,
+            "health_threshold": 3,
+        },
+        headers=auth_headers,
+    )
+    lid = r.json()["id"]
+    assert r.json()["health_interval"] == 30
+    assert r.json()["health_timeout"] == 3.0
+    assert r.json()["health_threshold"] == 3
+    r2 = client.put(
+        f"/api/links/{lid}",
+        json={"name": "A", "url_lan": health_server, "health_enabled": False},
+        headers=auth_headers,
+    )
+    assert r2.json()["health_enabled"] == 0

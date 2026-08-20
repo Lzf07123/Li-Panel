@@ -19,6 +19,11 @@ SAMPLE_INTERVAL_MINUTES = 10
 HISTORY_HOURS = 24
 MAX_HISTORY_ROWS = 144
 
+LINK_COLS = (
+    "id, name, url_lan, url_wan, health_enabled, health_interval, "
+    "health_timeout, health_threshold"
+)
+
 
 def _effective_url(link: sqlite3.Row) -> str:
     return link["url_wan"] or link["url_lan"]
@@ -29,7 +34,7 @@ def _now_utc() -> datetime:
 
 
 def _check_many(links: list[sqlite3.Row]) -> list[dict]:
-    """并发 ≤4 检查链接列表，返回按 link_id 排序的结果。"""
+    """并发 ≤4 检查链接列表（按链接自身超时），返回按 link_id 排序的结果。"""
     results: list[dict] = []
     pending: dict = {}
     for link in links:
@@ -48,7 +53,9 @@ def _check_many(links: list[sqlite3.Row]) -> list[dict]:
             pending[link["id"]] = link
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         futures = {
-            pool.submit(check_url, _effective_url(link)): link_id
+            pool.submit(
+                check_url, _effective_url(link), link["health_timeout"]
+            ): link_id
             for link_id, link in pending.items()
         }
         for future in as_completed(futures):
@@ -73,12 +80,12 @@ def health_links(
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
-    """当前用户全部链接的健康状态（up/down/unknown + 响应毫秒），并发 ≤4。"""
+    """当前用户全部启用检测链接的健康状态；每链接开关/间隔/超时/阈值。"""
     settings = request.app.state.settings
     if not settings.health_check:
         return {"enabled": False, "results": []}
     links = conn.execute(
-        "SELECT id, name, url_lan, url_wan FROM links WHERE user_id = ?",
+        f"SELECT {LINK_COLS} FROM links WHERE user_id = ? AND health_enabled = 1",
         (user["id"],),
     ).fetchall()
     results = _check_many(links)
@@ -91,7 +98,7 @@ def public_status(
     request: Request,
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
-    """公开状态页：仅公开链接的可用性汇总（访客可读）。"""
+    """公开状态页：仅公开且启用检测的链接可用性汇总（访客可读）。"""
     settings = request.app.state.settings
     site = get_site_settings(conn)
     if not (site.get("public_mode", "true") == "true" and settings.public_mode):
@@ -99,7 +106,7 @@ def public_status(
     if not settings.health_check:
         return {"enabled": False, "results": []}
     links = conn.execute(
-        "SELECT id, url_lan, url_wan FROM links WHERE is_public = 1"
+        f"SELECT {LINK_COLS} FROM links WHERE is_public = 1 AND health_enabled = 1"
     ).fetchall()
     return {"enabled": True, "results": _check_many(links)}
 
@@ -110,11 +117,8 @@ def _record_samples(
     results: list[dict],
     links: list[sqlite3.Row] | None = None,
 ) -> None:
-    """V23：每链接 ≥10 分钟采样一次写入 link_health，超 144 条滚动清理。
-
-    V28：状态相对上次采样发生变化时发通知（ntfy/Webhook，URL 存 site_settings）。
-    """
-    names = {row["id"]: row["name"] for row in links or []}
+    """采样写 link_health（每链接按自身间隔），应用失败阈值，状态变化发通知。"""
+    cfg = {row["id"]: row for row in links or []}
     notify_row = conn.execute(
         "SELECT key, value FROM site_settings WHERE key IN ('notify_url', 'notify_enabled')"
     ).fetchall()
@@ -126,8 +130,17 @@ def _record_samples(
     fmt = now.strftime("%Y-%m-%d %H:%M:%S")
     for item in results:
         link_id = item["link_id"]
+        link_cfg = cfg.get(link_id)
+        interval = (
+            link_cfg["health_interval"]
+            if link_cfg is not None
+            else SAMPLE_INTERVAL_MINUTES
+        )
+        threshold = (
+            link_cfg["health_threshold"] if link_cfg is not None else 1
+        )
         last = conn.execute(
-            "SELECT checked_at, status FROM link_health WHERE link_id = ? "
+            "SELECT checked_at, status, fail_count FROM link_health WHERE link_id = ? "
             "ORDER BY checked_at DESC LIMIT 1",
             (link_id,),
         ).fetchone()
@@ -139,10 +152,16 @@ def _record_samples(
             except ValueError:
                 last_dt = None
             if last_dt is not None and (now - last_dt) < timedelta(
-                minutes=SAMPLE_INTERVAL_MINUTES
+                minutes=interval
             ):
                 continue
         prev_status = last["status"] if last is not None else None
+        prev_fail = last["fail_count"] if last is not None else 0
+        fail_count = prev_fail + 1 if item["status"] == "down" else 0
+        effective = item["status"]
+        if item["status"] == "down" and fail_count < threshold:
+            effective = "up"  # 连续失败未达阈值，暂按可用处理
+        item["status"] = effective
         conn.execute(
             "DELETE FROM link_health WHERE link_id = ? AND id NOT IN ("
             "SELECT id FROM link_health WHERE link_id = ? "
@@ -150,22 +169,18 @@ def _record_samples(
             (link_id, link_id, MAX_HISTORY_ROWS - 1),
         )
         conn.execute(
-            "INSERT INTO link_health (link_id, user_id, status, ms, checked_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (link_id, user_id, item["status"], item["ms"], fmt),
+            "INSERT INTO link_health (link_id, user_id, status, ms, fail_count, checked_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (link_id, user_id, effective, item["ms"], fail_count, fmt),
         )
-        if (
-            notify_enabled
-            and notify_url
-            and prev_status != item["status"]
-        ):
+        if notify_enabled and notify_url and prev_status != effective:
             send_notification(
                 notify_url,
                 {
                     "event": "link_status_changed",
                     "link_id": link_id,
-                    "name": names.get(link_id, ""),
-                    "status": item["status"],
+                    "name": cfg[link_id]["name"] if link_id in cfg else "",
+                    "status": effective,
                     "previous_status": prev_status,
                     "ms": item["ms"],
                     "checked_at": fmt,
