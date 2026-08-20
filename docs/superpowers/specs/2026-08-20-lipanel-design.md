@@ -245,7 +245,7 @@ site_settings   (key TEXT PK, value TEXT, updated_at)
 - CSRF：SameSite=Lax + 所有写接口校验 Origin 同源；MVP 不引入额外 CSRF token
 - 限流：登录、SSO 回调、初始化接口 10 次/分钟/IP（内存滑动窗口）
 - 密码：scrypt（N=2^14、r=8、p=1、随机盐 16B）；用户名/密码规则见 5.3
-- 响应头：CSP `default-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'`；`X-Content-Type-Options: nosniff`；`Referrer-Policy: no-referrer`；认证响应 `Cache-Control: no-store`
+- 响应头：CSP `default-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self' https: http:; frame-ancestors 'none'`；`X-Content-Type-Options: nosniff`；`Referrer-Policy: no-referrer`；认证响应 `Cache-Control: no-store`（`frame-src` 于 V07 内置窗口打开方式时加入，仅允许 https/http 站点被内嵌，本站仍禁止被他人 iframe）
 - OIDC 对齐 Li&Pass 验收清单：
   - `state` / `nonce` 逐字符校验
   - `error=access_denied`（含 `account_blocked`）按失败处理

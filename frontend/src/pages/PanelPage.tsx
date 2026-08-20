@@ -8,6 +8,7 @@ import { AppHeader } from "../components/AppHeader";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
 import { LinkCard } from "../components/LinkCard";
+import { LinkPreviewModal } from "../components/LinkPreviewModal";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { SiteFooter } from "../components/SiteFooter";
 import { AuroraBackground } from "../components/bits/AuroraBackground";
@@ -34,6 +35,7 @@ export function PanelPage() {
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [recents, setRecents] = useState<RecentItem[]>(getRecent);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [previewLink, setPreviewLink] = useState<LinkOut | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -346,6 +348,7 @@ export function PanelPage() {
                     key={link.id}
                     link={link}
                     onActivate={(activated) => setRecents(recordRecent(activated))}
+                    onOpenModal={setPreviewLink}
                   />
                 ))}
               </div>
@@ -365,6 +368,7 @@ export function PanelPage() {
                       key={link.id}
                       link={link}
                       onActivate={(activated) => setRecents(recordRecent(activated))}
+                      onOpenModal={setPreviewLink}
                       listIndex={flatLinks.findIndex(
                         (item) => item.link.id === link.id,
                       )}
@@ -387,6 +391,7 @@ export function PanelPage() {
                     key={link.id}
                     link={link}
                     onActivate={(activated) => setRecents(recordRecent(activated))}
+                    onOpenModal={setPreviewLink}
                     listIndex={flatLinks.findIndex(
                       (item) => item.link.id === link.id,
                     )}
@@ -404,6 +409,7 @@ export function PanelPage() {
         links={allLinks}
         loggedIn={Boolean(me)}
       />
+      <LinkPreviewModal link={previewLink} onClose={() => setPreviewLink(null)} />
     </div>
   );
 }

@@ -31,6 +31,7 @@ const emptyLinkForm = {
   description: "",
   is_public: false,
   guest_url_mode: "hidden" as "hidden" | "show",
+  open_mode: "new_tab" as "new_tab" | "modal",
   tags: [] as string[],
 };
 
@@ -147,6 +148,7 @@ export function SettingsPage() {
       description: linkForm.description,
       is_public: linkForm.is_public,
       guest_url_mode: linkForm.guest_url_mode,
+      open_mode: linkForm.open_mode,
       tags: linkForm.tags,
     };
     if (linkForm.id === null) {
@@ -164,8 +166,13 @@ export function SettingsPage() {
       await linksApi.update(link.id, {
         name: link.name,
         url_lan: link.url_lan,
+        url_wan: link.url_wan,
+        group_id: link.group_id,
+        description: link.description,
+        tags: link.tags,
         is_public: !link.is_public,
         guest_url_mode: link.guest_url_mode,
+        open_mode: link.open_mode,
       });
       setLinks(await linksApi.list());
       toast.success(`「${link.name}」已${link.is_public ? "私密" : "公开"}`);
@@ -564,6 +571,19 @@ export function SettingsPage() {
                     <option value="hidden">访客隐藏 URL（/go 跳转）</option>
                     <option value="show">访客直接显示 URL</option>
                   </select>
+                  <select
+                    className="input"
+                    value={linkForm.open_mode}
+                    onChange={(e) =>
+                      setLinkForm({
+                        ...linkForm,
+                        open_mode: e.target.value as "new_tab" | "modal",
+                      })
+                    }
+                  >
+                    <option value="new_tab">新标签页打开</option>
+                    <option value="modal">内置窗口打开</option>
+                  </select>
                   <AsyncButton
                     type="submit"
                     status={saveLinkAction.status}
@@ -628,6 +648,7 @@ export function SettingsPage() {
                                       description: link.description,
                                       is_public: link.is_public,
                                       guest_url_mode: link.guest_url_mode,
+                                      open_mode: link.open_mode,
                                       tags: link.tags,
                                     })
                                   }

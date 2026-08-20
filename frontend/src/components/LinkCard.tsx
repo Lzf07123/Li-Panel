@@ -6,12 +6,15 @@ export function LinkCard({
   link,
   listIndex,
   onActivate,
+  onOpenModal,
 }: {
   link: LinkOut;
   listIndex?: number;
   onActivate?: (link: LinkOut) => void;
+  onOpenModal?: (link: LinkOut) => void;
 }) {
   const href = link.url ? link.url : `/go/${link.id}`;
+  const isModal = link.open_mode === "modal";
   const target = link.open_mode === "new_tab" ? "_blank" : undefined;
   const accent = ACCENT_CLASSES[accentFor(link.name)];
   const letter = link.name.trim().charAt(0).toUpperCase() || "?";
@@ -22,9 +25,13 @@ export function LinkCard({
       href={href}
       target={target}
       rel={target ? "noreferrer" : undefined}
-      onClick={() => {
+      onClick={(event) => {
         recordRecent(link);
         onActivate?.(link);
+        if (isModal) {
+          event.preventDefault();
+          onOpenModal?.(link);
+        }
       }}
       className="card card-interactive flex items-center gap-3 p-4"
     >
