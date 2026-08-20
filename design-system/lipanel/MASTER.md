@@ -91,6 +91,7 @@
 - V29 检测配置中心：links 列 `health_enabled/health_interval/health_timeout/health_threshold`（SCHEMA + ALTER 迁移 + 备份导入携带）；健康引擎按链接配置执行（开关排除、自身间隔/超时、连续失败阈值 `fail_count`）；管理页链接表单健康检查配置组；pytest 106 passed
 - V30 状态导出 API：`GET /api/health/export?format=csv|json`（仅本人启用检测链接，CSV 含表头）；pytest 110 passed
 - V31 SSO 解绑：`GET /api/sso/status`、`DELETE /api/sso/identity`（本地密码确认、错密 403、未绑定 400、解绑不删本地账号）；个人设置页解绑弹窗；pytest 114 passed
+- V32 RP 发起登出：`GET /auth/sso/logout`（本地注销 + OIDC 发现 `end_session_endpoint` + `id_token_hint` + `post_logout_redirect_uri` 白名单 `PANEL_SSO_LOGOUT_REDIRECTS`）；sessions 新增 `sso_id_token`（ALTER 迁移）；pytest 117 passed
 
 2026-08-20 首版交付实测（V1.2 1:1 复刻时代）：
 

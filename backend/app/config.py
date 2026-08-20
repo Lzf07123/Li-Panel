@@ -38,6 +38,7 @@ class Settings:
     link_icon_fetch: bool
     backup_keep: int
     health_check: bool
+    sso_logout_redirects: tuple[str, ...]
 
     @property
     def db_path(self) -> Path:
@@ -87,4 +88,13 @@ def load_settings(overrides: dict | None = None) -> Settings:
         if "backup_keep" in o
         else _env_int("PANEL_BACKUP_KEEP", 10),
         health_check=flag("health_check", "PANEL_HEALTH_CHECK", True),
+        sso_logout_redirects=(
+            tuple(str(x) for x in o["sso_logout_redirects"])
+            if "sso_logout_redirects" in o
+            else tuple(
+                part.strip()
+                for part in os.getenv("PANEL_SSO_LOGOUT_REDIRECTS", "").split(",")
+                if part.strip()
+            )
+        ),
     )

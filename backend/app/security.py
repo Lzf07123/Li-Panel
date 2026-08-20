@@ -67,15 +67,16 @@ def create_session(
     conn: sqlite3.Connection,
     user_id: int,
     sso_sid: str | None = None,
+    sso_id_token: str | None = None,
     session_days: int = 30,
 ) -> str:
     token = new_token()
     now = _now_utc()
     expires = now + timedelta(days=session_days)
     conn.execute(
-        "INSERT INTO sessions (token, user_id, sso_sid, expires_at, created_at, last_used_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (token, user_id, sso_sid, _fmt(expires), _fmt(now), _fmt(now)),
+        "INSERT INTO sessions (token, user_id, sso_sid, sso_id_token, expires_at, created_at, last_used_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (token, user_id, sso_sid, sso_id_token, _fmt(expires), _fmt(now), _fmt(now)),
     )
     return token
 

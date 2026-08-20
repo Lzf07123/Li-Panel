@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     token TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     sso_sid TEXT,
+    sso_id_token TEXT,
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     last_used_at TEXT
@@ -135,6 +136,10 @@ def connect(path: Path) -> sqlite3.Connection:
     return conn
 
 
+_SESSION_MIGRATIONS = [
+    "ALTER TABLE sessions ADD COLUMN sso_id_token TEXT",
+]
+
 _LINK_HEALTH_MIGRATIONS = [
     "ALTER TABLE links ADD COLUMN health_enabled INTEGER NOT NULL DEFAULT 1",
     "ALTER TABLE links ADD COLUMN health_interval INTEGER NOT NULL DEFAULT 10",
@@ -145,6 +150,11 @@ _LINK_HEALTH_MIGRATIONS = [
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    for statement in _SESSION_MIGRATIONS:
+        try:
+            conn.execute(statement)
+        except sqlite3.OperationalError:
+            pass
     for statement in _LINK_HEALTH_MIGRATIONS:
         try:
             conn.execute(statement)

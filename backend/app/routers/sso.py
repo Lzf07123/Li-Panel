@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -20,6 +20,57 @@ router = APIRouter(tags=["sso"])
 
 class UnbindIn(BaseModel):
     password: str
+
+
+def _safe_logout_redirect(value: str, settings) -> str:
+    """回跳白名单：环境变量 PANEL_SSO_LOGOUT_REDIRECTS；为空仅允许站内相对路径。"""
+    if value.startswith("/") and not value.startswith("//"):
+        return value
+    if value in settings.sso_logout_redirects:
+        return value
+    return "/"
+
+
+@router.get("/auth/sso/logout")
+def sso_logout(
+    request: Request,
+    lipanel_session: Annotated[str | None, Cookie()] = None,
+    conn: sqlite3.Connection = Depends(get_db),
+    redirect_after: str = "/",
+) -> RedirectResponse:
+    """RP 发起登出：本地会话注销 + IdP end_session_endpoint（id_token_hint）+ 回跳白名单。"""
+    settings = request.app.state.settings
+    target = _safe_logout_redirect(redirect_after, settings)
+
+    id_token: str | None = None
+    if lipanel_session:
+        row = conn.execute(
+            "SELECT sso_id_token FROM sessions WHERE token = ?", (lipanel_session,)
+        ).fetchone()
+        if row is not None:
+            id_token = row["sso_id_token"]
+        delete_session(conn, lipanel_session)
+
+    if not settings.oidc_enabled or not (
+        settings.oidc_issuer
+        and settings.oidc_client_id
+        and settings.oidc_redirect_uri
+    ):
+        return RedirectResponse(target, status_code=302)
+
+    try:
+        from app.oidc import OIDCClient
+
+        discovery = OIDCClient(settings).discover()
+        end_session = discovery.get("end_session_endpoint")
+        if not end_session:
+            return RedirectResponse(target, status_code=302)
+        params: dict[str, str] = {"post_logout_redirect_uri": target}
+        if id_token:
+            params["id_token_hint"] = id_token
+        return RedirectResponse(end_session + "?" + urlencode(params), status_code=302)
+    except Exception:
+        return RedirectResponse(target, status_code=302)
 
 
 @router.get("/api/sso/status")
@@ -180,6 +231,7 @@ def sso_callback(
             conn,
             identity["user_id"],
             sso_sid=claims.get("sid"),
+            sso_id_token=tokens.get("id_token"),
             session_days=settings.session_days,
         )
         response = RedirectResponse("/", status_code=302)
