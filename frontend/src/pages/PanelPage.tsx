@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { authApi, panelApi } from "../api/client";
@@ -10,7 +10,6 @@ import { PageSkeleton } from "../components/PageSkeleton";
 import { SiteFooter } from "../components/SiteFooter";
 import { AuroraBackground } from "../components/bits/AuroraBackground";
 import { BlurText } from "../components/bits/BlurText";
-import { CountUp } from "../components/bits/CountUp";
 import { FloatingBackground } from "../components/FloatingBackground";
 import { TechAmbience } from "../components/bits/TechAmbience";
 
@@ -29,11 +28,45 @@ export function PanelPage() {
   const [panel, setPanel] = useState<PanelOut | null>(null);
   const [me, setMe] = useState<MeOut | null>(null);
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     authApi.meSilent().then(setMe).catch(() => setMe(null));
     panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, []);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target !== null &&
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+      if (
+        event.key === "/" &&
+        !typing &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
+      if (
+        event.key === "Escape" &&
+        document.activeElement === searchRef.current
+      ) {
+        if (query) {
+          setQuery("");
+        } else {
+          searchRef.current?.blur();
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [query]);
 
   const groups = useMemo(
     () =>
@@ -105,8 +138,10 @@ export function PanelPage() {
               {site.description ? (
                 <p className="max-w-xl text-sm text-muted">{site.description}</p>
               ) : null}
-              <span className="badge badge-muted mt-1">
-                共 <CountUp to={total} /> 个快捷方式
+              <span className="badge badge-muted mt-1" aria-live="polite">
+                {query.trim()
+                  ? `找到 ${total} 个结果`
+                  : `共 ${total} 个快捷方式`}
               </span>
             </section>
           ) : null}
@@ -125,12 +160,17 @@ export function PanelPage() {
               <path d="m20 20-3.5-3.5" />
             </svg>
             <input
+              ref={searchRef}
               type="search"
               className="input pl-9"
               placeholder="搜索名称、描述、标签…"
+              aria-label="搜索快捷方式"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-[10px] leading-none text-muted">
+              /
+            </kbd>
           </div>
 
           {groups.map((group) =>
