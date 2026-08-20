@@ -158,6 +158,7 @@
 - ✅ V28（通知通道）：2026-08-21 完成。站点设置 `notify_url/notify_enabled`（默认空/关）；状态相对上次采样变化时向 ntfy/Webhook POST JSON（5s 超时、失败静默）；首次采样视为变化。pytest 103 passed（本地 fixture：变化通知/同状态不通知/关闭不发/失败忽略）。
 - ✅ V29（检测配置中心）：2026-08-21 完成。links 新增 `health_enabled/health_interval/health_timeout/health_threshold`（含 ALTER 迁移与备份导入携带）；引擎按链接配置执行（开关排除、间隔采样、超时、连续失败阈值）；管理页链接表单「健康检查」配置组。pytest 106 passed（开关排除/阈值两轮判定/配置往返）。
 - ✅ V30（状态导出 API）：2026-08-21 完成。`GET /api/health/export?format=csv|json`（仅本人启用检测链接，含名称/状态/毫秒/时间）。pytest 110 passed。
-- ✅ Phase C（V21–V30）全部完成：2026-08-21，提交范围 `2d36084`（V21）→ 本次提交。
-- ⬜ Phase D（V31–V40）：待执行。
+- ✅ Phase C（V21–V30）全部完成：2026-08-21，提交范围 `2d36084`（V21）→ `16d254e`（V30）。
+- ✅ V31（SSO 解绑/换绑）：2026-08-21 完成。`GET /api/sso/status` + `DELETE /api/sso/identity`（本地密码确认、错密 403、未绑定 400、不删本地账号）；个人设置页解绑确认弹窗（密码输入）。pytest 114 passed。
+- ⬜ V32–V40：待执行。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

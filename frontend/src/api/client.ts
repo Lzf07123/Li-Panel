@@ -202,6 +202,21 @@ export const tagsApi = {
     }),
 };
 
+export const ssoApi = {
+  status: () =>
+    api<{
+      bound: boolean;
+      provider: string | null;
+      email: string | null;
+      nickname: string | null;
+    }>("/api/sso/status"),
+  unbind: (password: string) =>
+    api<{ ok: boolean }>("/api/sso/identity", {
+      method: "DELETE",
+      body: JSON.stringify({ password }),
+    }),
+};
+
 export const rssApi = {
   feeds: () =>
     api<{

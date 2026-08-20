@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 
-import { authApi, backupApi, groupsApi, linksApi, rssApi, settingsApi, tagsApi } from "../api/client";
+import { authApi, backupApi, groupsApi, linksApi, rssApi, settingsApi, ssoApi, tagsApi } from "../api/client";
 import type { GroupOut, LinkOut, MeOut, SiteSettings } from "../api/types";
 import { AppHeader } from "../components/AppHeader";
 import { AsyncButton } from "../components/AsyncButton";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Notice } from "../components/Notice";
+import { PasswordInput } from "../components/PasswordInput";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { ScrollTabs } from "../components/ScrollTabs";
 import { SiteFooter } from "../components/SiteFooter";
@@ -78,6 +79,8 @@ export function SettingsPage() {
   >([]);
   const [restoreName, setRestoreName] = useState<string | null>(null);
   const [rssUrls, setRssUrls] = useState<string[]>(["", "", ""]);
+  const [unbindOpen, setUnbindOpen] = useState(false);
+  const [unbindPassword, setUnbindPassword] = useState("");
   const [theme, setTheme] = useTheme();
   const toast = useToast();
 
@@ -202,6 +205,14 @@ export function SettingsPage() {
     },
     { onError: (err) => setError(err.message) },
   );
+
+  const unbindSsoAction = useAsyncAction(async () => {
+    await ssoApi.unbind(unbindPassword);
+    setUnbindOpen(false);
+    setUnbindPassword("");
+    setMe(await authApi.me());
+    toast.success("SSO 已解绑");
+  }, { onError: (err) => setError(err.message) });
 
   const saveRssAction = useAsyncAction(async () => {
     const urls = rssUrls
@@ -1295,10 +1306,19 @@ export function SettingsPage() {
                 <div className="rounded-xl bg-surface-2/60 p-4">
                   <p className="text-sm font-medium text-foreground">SSO 绑定</p>
                   {me.sso.bound ? (
-                    <p className="mt-1 text-sm text-muted">
-                      已绑定：{me.sso.provider}{" "}
-                      {me.sso.email ? `（${me.sso.email}）` : ""}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <p className="text-sm text-muted">
+                        已绑定：{me.sso.provider}{" "}
+                        {me.sso.email ? `（${me.sso.email}）` : ""}
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-danger ml-auto h-8 px-3 text-xs"
+                        onClick={() => setUnbindOpen(true)}
+                      >
+                        解绑
+                      </button>
+                    </div>
                   ) : (
                     <p className="mt-1 text-sm text-muted">未绑定</p>
                   )}
@@ -1410,6 +1430,29 @@ export function SettingsPage() {
         }}
         onCancel={() => setDeleteGroupId(null)}
       />
+      <ConfirmDialog
+        open={unbindOpen}
+        title="解绑 SSO"
+        message="解绑后仍可用本地账号密码登录，确定继续？"
+        confirmLabel="解绑"
+        status={unbindSsoAction.status}
+        onConfirm={() => void unbindSsoAction.run()}
+        onCancel={() => {
+          setUnbindOpen(false);
+          setUnbindPassword("");
+        }}
+      >
+        <div className="mt-3">
+          <span className="label">本地密码</span>
+          <PasswordInput
+            value={unbindPassword}
+            onChange={(e) => setUnbindPassword(e.target.value)}
+            className="input"
+            autoComplete="current-password"
+            placeholder="输入本地密码确认"
+          />
+        </div>
+      </ConfirmDialog>
       <ConfirmDialog
         open={restoreName !== null}
         title="从快照恢复"

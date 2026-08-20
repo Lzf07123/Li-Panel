@@ -11,10 +11,54 @@ from pydantic import BaseModel, Field
 
 from app import oidc
 from app.db import create_user, get_db, get_user_by_username
+from app.deps import current_user
 from app.routers.setup import validate_username
 from app.security import create_session, delete_session, hash_password, new_token, verify_password
 
 router = APIRouter(tags=["sso"])
+
+
+class UnbindIn(BaseModel):
+    password: str
+
+
+@router.get("/api/sso/status")
+def sso_status(
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    row = conn.execute(
+        "SELECT provider, email, nickname FROM sso_identities WHERE user_id = ?",
+        (user["id"],),
+    ).fetchone()
+    if row is None:
+        return {"bound": False, "provider": None, "email": None, "nickname": None}
+    return {
+        "bound": True,
+        "provider": row["provider"],
+        "email": row["email"],
+        "nickname": row["nickname"],
+    }
+
+
+@router.delete("/api/sso/identity")
+def sso_unbind(
+    body: UnbindIn,
+    user: sqlite3.Row = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    """解绑 SSO：需本地密码确认；只删身份，不删本地账号。"""
+    row = conn.execute(
+        "SELECT id FROM sso_identities WHERE user_id = ?", (user["id"],)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=400, detail="当前账号未绑定 SSO")
+    from app.security import verify_password
+
+    if not verify_password(body.password, user["password_hash"], user["salt"]):
+        raise HTTPException(status_code=403, detail="本地密码错误")
+    conn.execute("DELETE FROM sso_identities WHERE id = ?", (row["id"],))
+    return {"ok": True}
 
 FLOW_MINUTES = 10
 

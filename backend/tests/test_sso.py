@@ -158,3 +158,55 @@ def test_logout_uri_safety(sso_client):
     assert r.headers["location"] == "/"
     r2 = sso_client.get("/auth/logout?next=/settings", follow_redirects=False)
     assert r2.headers["location"] == "/settings"
+
+
+def _bind_sso(client, user_id=1):
+    from app.db import connect
+
+    conn = connect(client.app.state.db_path)
+    conn.execute(
+        "INSERT INTO sso_identities (user_id, provider, subject, email, nickname) "
+        "VALUES (?, 'lipass', 'sub-1', 'a@example.com', 'Alias')",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_sso_status_bound(client, auth_headers):
+    _bind_sso(client)
+    r = client.get("/api/sso/status", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json() == {
+        "bound": True,
+        "provider": "lipass",
+        "email": "a@example.com",
+        "nickname": "Alias",
+    }
+
+
+def test_sso_unbind_with_password(client, auth_headers):
+    _bind_sso(client)
+    r = client.request(
+        "DELETE", "/api/sso/identity", json={"password": "secret123"}, headers=auth_headers
+    )
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    status = client.get("/api/sso/status", headers=auth_headers).json()
+    assert status["bound"] is False
+    # 本地账号仍在
+    assert client.get("/api/auth/me", headers=auth_headers).status_code == 200
+
+
+def test_sso_unbind_wrong_password(client, auth_headers):
+    _bind_sso(client)
+    r = client.request(
+        "DELETE", "/api/sso/identity", json={"password": "wrong"}, headers=auth_headers
+    )
+    assert r.status_code == 403
+
+
+def test_sso_unbind_not_bound(client, auth_headers):
+    r = client.request(
+        "DELETE", "/api/sso/identity", json={"password": "secret123"}, headers=auth_headers
+    )
+    assert r.status_code == 400
