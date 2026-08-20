@@ -37,6 +37,13 @@
 
 ## 验收状态
 
+2026-08-20 端口变量化重建实测：
+
+- `PANEL_PORT`（默认 8000）已贯通 Dockerfile（EXPOSE/HEALTHCHECK/CMD）、compose（build.args/environment/ports）、`.env.example` 与设计文档 §11
+- `docker compose build` 成功 → `docker compose up -d` → `curl -fsS http://localhost:8000/api/health` 返回 `{"status":"ok"}`
+- `docker compose ps`：`Up (healthy)`，`0.0.0.0:8000->8000/tcp`；`docker stats`：内存 46.01MiB / CPU 0.24% / 3 进程（仍 ≤90MB 目标）
+- 覆盖验证：`PANEL_PORT=8080 docker compose config` 解析为 `published: 8080` / `target: 8080`，环境变量同步注入
+
 2026-08-20 Phase A（V01–V10）实测：
 
 - 前端：`npx tsc --noEmit && npx vite build` 通过；V01–V10 每版独立提交于 `codex/50-iterations`，路线图见 `docs/superpowers/plans/2026-08-20-lipanel-50-iterations.md`
