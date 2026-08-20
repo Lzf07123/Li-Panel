@@ -404,3 +404,134 @@
      认证默认、工作台/后台 soft；移动端隐藏光束/光点并停用网格动画
    - ⚠️ 每个 animation 必须定义对应 @keyframes；reduced-motion 下单帧
 ============================================================= */
+
+/* 缓移网格：56px 基线 + 径向渐隐遮罩，background-position 12s 循环 */
+.tech-grid {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--lipanel-tech-grid-line) 0 1px,
+      transparent 1px 56px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--lipanel-tech-grid-line) 0 1px,
+      transparent 1px 56px
+    ),
+    linear-gradient(
+      90deg,
+      var(--lipanel-tech-grid-accent) 0 2px,
+      transparent 2px 336px
+    );
+  background-size: 56px 56px, 56px 56px, 336px 100%;
+  animation: lipanel-grid-move 12s linear infinite;
+  mask-image: radial-gradient(ellipse at center, black 25%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 25%, transparent 75%);
+}
+
+@keyframes lipanel-grid-move {
+  from {
+    background-position: 0 0, 0 0, 0 0;
+  }
+  to {
+    background-position: 0 0, 0 0, 336px 0;
+  }
+}
+
+/* 扫掠光束：斜切 16°，长停顿，三条错峰 */
+.tech-beam {
+  position: absolute;
+  top: 20%;
+  width: 42%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--lipanel-tech-beam),
+    transparent
+  );
+  opacity: 0;
+  animation: lipanel-beam-sweep 10s ease-in-out infinite;
+}
+.tech-beam:nth-child(2) {
+  top: 55%;
+  width: 30%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--lipanel-tech-beam-2),
+    transparent
+  );
+  animation-delay: 4.2s;
+}
+.tech-beam:nth-child(3) {
+  top: 78%;
+  width: 36%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--lipanel-tech-beam-3),
+    transparent
+  );
+  animation-delay: 7.5s;
+}
+
+@keyframes lipanel-beam-sweep {
+  0%,
+  72% {
+    transform: translateX(-140%) skewX(-16deg);
+    opacity: 0;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  88% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(340%) skewX(-16deg);
+    opacity: 0;
+  }
+}
+
+/* 呼吸光点：7px 圆点 + 辉光，6s 脉动并上下浮动 */
+.tech-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--lipanel-tech-dot-glow);
+  box-shadow: 0 0 12px var(--lipanel-tech-dot-glow);
+  animation: lipanel-dot-breathe 6s ease-in-out infinite;
+}
+.tech-dot:nth-child(4) { left: 12%; top: 30%; animation-delay: 0s; }
+.tech-dot:nth-child(5) { left: 78%; top: 18%; animation-delay: 1.2s; }
+.tech-dot:nth-child(6) { left: 24%; top: 74%; animation-delay: 2.4s; }
+.tech-dot:nth-child(7) { left: 64%; top: 62%; animation-delay: 3.6s; }
+.tech-dot:nth-child(8) { left: 88%; top: 46%; animation-delay: 4.8s; }
+.tech-dot:nth-child(9) { left: 44%; top: 12%; animation-delay: 1.8s; }
+.tech-dot:nth-child(10) { left: 6%; top: 56%; animation-delay: 3s; }
+.tech-dot:nth-child(11) { left: 54%; top: 86%; animation-delay: 4.2s; }
+
+@keyframes lipanel-dot-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-12px) scale(1.2);
+    opacity: 0.55;
+  }
+}
+
+/* 移动端减量：隐藏光束/光点，网格动画停用 */
+@media (max-width: 767px) {
+  .tech-beam,
+  .tech-dot {
+    display: none;
+  }
+  .tech-grid {
+    animation: none;
+  }
+}
