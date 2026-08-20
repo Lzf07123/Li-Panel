@@ -216,7 +216,11 @@ export function PanelPage() {
             )
           }
         />
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 outline-none sm:px-6 lg:px-8"
+        >
           {site ? (
             <section className="mb-10 flex flex-col items-center gap-3 text-center">
               <Brand className="brand-halo h-14 w-14" />

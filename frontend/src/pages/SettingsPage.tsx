@@ -218,7 +218,11 @@ export function SettingsPage() {
             </button>
           }
         />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:px-6 lg:px-8"
+        >
           <ScrollTabs fadeColor="var(--lipanel-bg)">
             {TABS.map((item) => (
               <button
