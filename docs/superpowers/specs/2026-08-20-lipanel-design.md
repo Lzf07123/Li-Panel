@@ -37,7 +37,7 @@
 | OIDC 客户端 | `httpx`（发现/换码/userinfo/JWKS）+ `PyJWT` + `cryptography` | 满足 RS256 验签 |
 | 前端 | React + TypeScript + Vite + Tailwind CSS 4（按 Li&Design 模板原样） | 与模板/Li&Pass 一致，不做改写 |
 | 测试 | pytest + fastapi TestClient | 认证与可见性是核心，必须有测试 |
-| 部署 | Docker 多阶段构建 + compose，数据卷挂载，加速源环境变量 | 一键部署，内存目标约 50–90MB |
+| 部署 | Docker 多阶段构建 + compose，数据卷挂载，加速源环境变量 | 一键部署，实测内存约 46MiB（2026-08-20） |
 
 ## 4. 数据模型
 
@@ -306,7 +306,7 @@ M3（交付）：
 
 12. pytest 测试全套
 13. Dockerfile + compose.yaml + `.env.example` + README
-14. 容器内存实测（`docker stats`）回填本文档
+14. 容器内存实测（`docker stats`）回填本文档（实测 45.78MiB / 0.19% CPU，已完成）
 
 P1 后续：解绑/换绑、RP 发起登出、回程登出、图标库/上传、内/外网切换、搜索增强、备份导入导出。
 

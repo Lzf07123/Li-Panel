@@ -1,0 +1,99 @@
+/* React Bits PillNav 风格标签：表面色胶囊置于表面 2 色轨道上，
+   hover 圆环（主色）从底部展开并切换文案，活动项固定为主色。 */
+.pill-tabs .scroll-tabs {
+  width: fit-content;
+  max-width: 100%;
+  gap: 3px;
+  padding: 5px;
+  background: var(--lipanel-surface-2);
+  border: 1px solid var(--lipanel-border);
+  border-radius: 9999px;
+}
+
+.pill-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 17px;
+  border-radius: 9999px;
+  background: var(--lipanel-surface);
+  color: var(--lipanel-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pill-tab-circle {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  border-radius: 50%;
+  background: var(--lipanel-primary);
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.pill-tab-stack {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  z-index: 1;
+}
+
+.pill-tab-label,
+.pill-tab-label-hover {
+  display: inline-block;
+  line-height: 1;
+  will-change: transform, opacity;
+}
+
+.pill-tab-label-hover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--lipanel-primary-fg);
+}
+
+.pill-tab.is-active {
+  background: var(--lipanel-primary);
+  color: var(--lipanel-primary-fg);
+}
+
+/* 活动标签流动扫光：与主按钮同一节奏，标签文字始终压在光层之上 */
+.pill-tab.is-active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.32) 50%,
+    transparent 58%
+  );
+  transform: translateX(-130%);
+  animation: btn-sheen 4s var(--ease-out) 1s infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark .pill-tab.is-active::after {
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(18, 49, 43, 0.16) 50%,
+    transparent 58%
+  );
+}
+
+.pill-tab.is-active .pill-tab-circle {
+  display: none;
+}
