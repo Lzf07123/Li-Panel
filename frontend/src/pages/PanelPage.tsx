@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { authApi, panelApi } from "../api/client";
+import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { AppHeader } from "../components/AppHeader";
-import { AuroraBackground } from "../components/AuroraBackground";
-import { BlurText } from "../components/BlurText";
-import { CountUp } from "../components/CountUp";
-import { FloatingBackground } from "../components/FloatingBackground";
-import { GroupSection } from "../components/GroupSection";
+import { Brand } from "../components/Brand";
 import { LinkCard } from "../components/LinkCard";
 import { PageSkeleton } from "../components/PageSkeleton";
-import { api, ApiError, type LinkItem, type Me, type PanelData } from "../lib/api";
-import { TechAmbience } from "../components/TechAmbience";
+import { SiteFooter } from "../components/SiteFooter";
+import { AuroraBackground } from "../components/bits/AuroraBackground";
+import { BlurText } from "../components/bits/BlurText";
+import { CountUp } from "../components/bits/CountUp";
+import { FloatingBackground } from "../components/FloatingBackground";
+import { TechAmbience } from "../components/bits/TechAmbience";
 
-function matches(link: LinkItem, query: string): boolean {
+function matches(link: LinkOut, query: string): boolean {
   const q = query.trim().toLowerCase();
-  if (!q) {
-    return true;
-  }
+  if (!q) return true;
   return (
     link.name.toLowerCase().includes(q) ||
     link.description.toLowerCase().includes(q) ||
@@ -25,23 +26,13 @@ function matches(link: LinkItem, query: string): boolean {
 }
 
 export function PanelPage() {
-  const [panel, setPanel] = useState<PanelData | null>(null);
-  const [me, setMe] = useState<Me | null>(null);
-  const [error, setError] = useState("");
+  const [panel, setPanel] = useState<PanelOut | null>(null);
+  const [me, setMe] = useState<MeOut | null>(null);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
-    api
-      .getPanel()
-      .then(setPanel)
-      .catch((err: unknown) => {
-        if (err instanceof ApiError && err.status === 401) {
-          window.location.href = "/login";
-        } else {
-          setError("加载面板失败");
-        }
-      });
+    authApi.meSilent().then(setMe).catch(() => setMe(null));
+    panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, []);
 
   const groups = useMemo(
@@ -54,60 +45,114 @@ export function PanelPage() {
   );
   const ungrouped = (panel?.ungrouped ?? []).filter((link) => matches(link, query));
   const site = panel?.site;
-  const total = (panel?.groups.reduce((sum, group) => sum + group.links.length, 0) ?? 0) + ungrouped.length;
+  const total =
+    (panel?.groups.reduce((sum, group) => sum + group.links.length, 0) ?? 0) +
+    ungrouped.length;
 
-  if (!panel && !error) {
-    return (
-      <div className="relative min-h-screen bg-background">
-        <AuroraBackground soft />
-        <div className="relative z-10">
-          <AppHeader username={me?.user.username} />
-          <PageSkeleton />
-        </div>
-      </div>
-    );
+  const logout = async () => {
+    await authApi.logout().catch(() => undefined);
+    window.location.href = "/";
+  };
+
+  if (!panel) {
+    return <PageSkeleton title="快捷方式" />;
   }
 
   return (
-    <div className="relative min-h-screen bg-background">
-      <AuroraBackground soft />
-      <FloatingBackground shapeCount={10} calm />
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
+      <FloatingBackground theme="auto" transparent shapeCount={10} />
+      <AuroraBackground />
       <TechAmbience />
-      <div className="relative z-10">
-        <AppHeader username={me?.user.username} />
-        <main className="mx-auto max-w-7xl px-4 py-8">
-          {error ? <div className="badge badge-danger mb-6 w-full justify-center py-2">{error}</div> : null}
+      <div className="relative z-10 flex flex-1 flex-col">
+        <AppHeader
+          title={me ? `欢迎，${me.user.username}` : "快捷方式"}
+          actions={
+            me ? (
+              <>
+                <Link to="/settings" className="btn btn-ghost h-9 px-3">
+                  管理
+                </Link>
+                <button
+                  type="button"
+                  className="btn btn-ghost h-9 px-3"
+                  onClick={logout}
+                >
+                  退出
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="btn btn-primary h-9 px-4">
+                登录
+              </Link>
+            )
+          }
+        />
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
           {site ? (
-            <section className="mb-8 flex flex-col items-center gap-2 text-center">
-              <img src={site.logo || "/brand-logo.webp"} alt="" className="h-14 w-14 rounded-2xl" />
-              <h1 className="text-2xl font-semibold text-foreground">
-                <BlurText text={site.site_name} />
+            <section className="mb-10 flex flex-col items-center gap-3 text-center">
+              <Brand className="brand-halo h-14 w-14" />
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                <BlurText
+                  as="span"
+                  text={site.site_name}
+                  animateBy="words"
+                  direction="top"
+                  delay={120}
+                  stepDuration={0.35}
+                />
               </h1>
               <p className="text-sm text-muted">{site.slogan}</p>
-              {site.description ? <p className="max-w-xl text-sm text-muted">{site.description}</p> : null}
-              <span className="badge badge-muted mt-2">
-                共 <CountUp value={total} /> 个快捷方式
+              {site.description ? (
+                <p className="max-w-xl text-sm text-muted">{site.description}</p>
+              ) : null}
+              <span className="badge badge-muted mt-1">
+                共 <CountUp to={total} /> 个快捷方式
               </span>
             </section>
           ) : null}
+
           <div className="relative mx-auto mb-8 max-w-md">
-            <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true">
-              <use href="/icons.svg#i-search" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
             </svg>
             <input
+              type="search"
               className="input pl-9"
               placeholder="搜索名称、描述、标签…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          {groups.map((group) => (
-            <GroupSection key={group.id} group={group} />
-          ))}
+
+          {groups.map((group) =>
+            group.links.length === 0 ? null : (
+              <section key={group.id} className="mb-8">
+                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
+                  <span className="h-px w-4 bg-border" />
+                  {group.name}
+                </h2>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {group.links.map((link) => (
+                    <LinkCard key={link.id} link={link} />
+                  ))}
+                </div>
+              </section>
+            ),
+          )}
+
           {ungrouped.length > 0 ? (
             <section className="mb-8">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
-                <svg className="h-4 w-4" aria-hidden="true"><use href="/icons.svg#i-grid" /></svg>
+                <span className="h-px w-4 bg-border" />
                 未分组
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -117,13 +162,8 @@ export function PanelPage() {
               </div>
             </section>
           ) : null}
-          {site ? (
-            <footer className="mt-12 border-t border-border pt-6 pb-4 text-center text-xs text-muted">
-              {site.footer_text}
-              {site.icp ? ` · ${site.icp}` : ""}
-            </footer>
-          ) : null}
         </main>
+        <SiteFooter />
       </div>
     </div>
   );

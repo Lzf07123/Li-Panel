@@ -13,6 +13,7 @@ services:
       - "8000:8000"
     environment:
       PANEL_DATA_DIR: /app/data
+      ENVIRONMENT: ${ENVIRONMENT:-development}
       PANEL_SECRET_KEY: ${PANEL_SECRET_KEY:?请在 .env 中设置 PANEL_SECRET_KEY}
       PANEL_PUBLIC_MODE: ${PANEL_PUBLIC_MODE:-true}
       PANEL_COOKIE_SECURE: ${PANEL_COOKIE_SECURE:-false}

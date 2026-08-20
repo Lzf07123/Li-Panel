@@ -1,63 +1,87 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { authApi } from "../api/client";
+import { AsyncButton } from "../components/AsyncButton";
 import { AuthShell } from "../components/AuthShell";
-import { api, ApiError } from "../lib/api";
+import { Notice } from "../components/Notice";
+import { PasswordInput } from "../components/PasswordInput";
+import { useAsyncAction } from "../hooks/useAsyncAction";
+import { useToast } from "../hooks/useToast";
 
 export function SetupPage() {
-  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
+  const toast = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    api.setupStatus().then((status) => {
-      if (!status.required) {
-        navigate("/login", { replace: true });
-      }
-    });
+    authApi
+      .setupStatus()
+      .then((status) => {
+        if (!status.required) {
+          navigate("/login", { replace: true });
+        } else {
+          setReady(true);
+        }
+      })
+      .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      await api.createAdmin(username, password);
+  const setupAction = useAsyncAction(
+    async (name: string, pass: string) => {
+      await authApi.createAdmin({ username: name, password: pass });
+      toast.success("管理员账号已创建，请登录");
       navigate("/login", { replace: true });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "初始化失败");
-    }
-  };
+    },
+    {
+      onError: (err) =>
+        toast.error(err instanceof Error ? err.message : "初始化失败"),
+    },
+  );
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await setupAction.run(username, password);
+  }
+
+  if (!ready) return null;
 
   return (
-    <AuthShell>
-      <p className="mb-4 text-sm text-muted">首次启动，请创建管理员账号。</p>
-      <form onSubmit={submit} className="space-y-4">
-        {error ? <div className="badge badge-danger w-full justify-center py-2">{error}</div> : null}
-        <div>
-          <label className="label" htmlFor="setup-username">用户名</label>
+    <AuthShell title="初始化管理员" subtitle="首次启动，请创建管理员账号">
+      <form onSubmit={handleSubmit} className="animate-fade-up space-y-4">
+        <Notice intent="info">
+          用户名 3–32 位字母/数字/_/-，密码至少 8 位。初始化后此入口关闭。
+        </Notice>
+        <label className="block">
+          <span className="label">用户名</span>
           <input
-            id="setup-username"
-            className="input"
+            type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            className="input"
             autoComplete="username"
             required
           />
-        </div>
-        <div>
-          <label className="label" htmlFor="setup-password">密码（至少 8 位）</label>
-          <input
-            id="setup-password"
-            type="password"
-            className="input"
+        </label>
+        <label className="block">
+          <span className="label">密码</span>
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="input"
             autoComplete="new-password"
             required
           />
-        </div>
-        <button type="submit" className="btn btn-primary w-full">创建管理员</button>
+        </label>
+        <AsyncButton
+          type="submit"
+          status={setupAction.status}
+          className="btn btn-primary w-full"
+        >
+          创建管理员
+        </AsyncButton>
       </form>
     </AuthShell>
   );

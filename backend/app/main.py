@@ -25,20 +25,27 @@ FRONTEND_DIST = next(
     PROJECT_ROOT / "frontend" / "dist",
 )
 
-CSP = (
-    "default-src 'self'; style-src 'self'; img-src 'self' data: https:; "
-    "connect-src 'self'; frame-ancestors 'none'"
-)
+def _build_csp(settings: Settings) -> str:
+    """构造 CSP：生产禁用内联样式；开发保留以支撑前端动效的内联样式（与参考实现一致）。"""
+    style_src = (
+        "'self'" if settings.environment == "production" else "'self' 'unsafe-inline'"
+    )
+    return (
+        f"default-src 'self'; connect-src 'self'; "
+        f"img-src 'self' data:; style-src {style_src}; object-src 'none'; "
+        f"base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     app = FastAPI(
         title="Li&Panel",
-        docs_url=None,
-        redoc_url=None,
-        openapi_url=None,
+        docs_url=None if settings.environment == "production" else "/docs",
+        redoc_url=None if settings.environment == "production" else "/redoc",
+        openapi_url=None if settings.environment == "production" else "/openapi.json",
     )
+    csp = _build_csp(settings)
     app.state.settings = settings
     app.state.db_path = settings.db_path
     app.state.uploads_dir = settings.uploads_dir
@@ -64,7 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         {"error": "跨域请求被拒绝"}, status_code=403
                     )
         response = await call_next(request)
-        response.headers["content-security-policy"] = CSP
+        response.headers["content-security-policy"] = csp
         response.headers["x-content-type-options"] = "nosniff"
         response.headers["referrer-policy"] = "no-referrer"
         if request.url.path.startswith(("/api/", "/auth/")):

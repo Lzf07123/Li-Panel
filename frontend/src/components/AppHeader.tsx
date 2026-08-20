@@ -1,49 +1,41 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { api } from "../lib/api";
-import { TechAmbience } from "./TechAmbience";
+import { APP_NAME } from "../lib/brand";
+import { ShinyText } from "./bits/ShinyText";
+import { Brand } from "./Brand";
 import { ThemeToggle } from "./ThemeToggle";
 
-export function AppHeader({ username }: { username?: string }) {
-  const logout = async () => {
-    await api.logout();
-    window.location.href = "/";
-  };
+export function AppHeader({
+  title,
+  actions,
+}: {
+  title: string;
+  actions?: ReactNode;
+}) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-surface/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/brand-logo.webp" alt="" className="h-7 w-7 rounded-lg" />
-          <span className="hidden text-sm font-semibold text-foreground sm:inline">
-            Li&Panel
-          </span>
+    <header className="sticky top-0 z-20 border-b border-border bg-surface/85 backdrop-blur">
+      <span
+        aria-hidden="true"
+        className="flow-rule absolute inset-x-0 bottom-0 h-px rounded-none"
+      />
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <Link
+          to="/"
+          className="flex shrink-0 items-center gap-2.5 rounded-lg"
+          aria-label={`${APP_NAME} 首页`}
+        >
+          <Brand className="h-8 w-8" />
+          <ShinyText
+            text={APP_NAME}
+            className="text-[15px] font-semibold tracking-tight text-foreground"
+            duration={6}
+          />
         </Link>
-        <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
-          {username ? (
-            <>
-              <Link to="/settings" className="btn btn-ghost h-9 px-3">
-                <svg className="h-4 w-4" aria-hidden="true"><use href="/icons.svg#i-gear" /></svg>
-                <span className="hidden sm:inline">管理</span>
-              </Link>
-              <button
-                type="button"
-                className="btn btn-ghost h-9 px-3"
-                onClick={logout}
-                aria-label="退出登录"
-              >
-                <svg className="h-4 w-4" aria-hidden="true"><use href="/icons.svg#i-logout" /></svg>
-                <span className="hidden sm:inline">{username}</span>
-              </button>
-            </>
-          ) : (
-            <Link to="/login" className="btn btn-primary h-9 px-4">
-              登录
-            </Link>
-          )}
-        </div>
+        <span className="hidden truncate text-sm text-muted sm:inline">{title}</span>
+        <div className="ml-auto flex items-center gap-2">{actions}</div>
+        <ThemeToggle />
       </div>
-      <TechAmbience />
     </header>
   );
 }

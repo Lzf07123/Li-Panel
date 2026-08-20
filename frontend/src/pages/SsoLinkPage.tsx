@@ -1,19 +1,29 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { authApi } from "../api/client";
+import { AsyncButton } from "../components/AsyncButton";
 import { AuthShell } from "../components/AuthShell";
-import { api, ApiError } from "../lib/api";
+import { Notice } from "../components/Notice";
+import { PasswordInput } from "../components/PasswordInput";
+import { useAsyncAction } from "../hooks/useAsyncAction";
+import { useToast } from "../hooks/useToast";
+
+type Action = "bind" | "create";
 
 export function SsoLinkPage() {
-  const navigate = useNavigate();
-  const [action, setAction] = useState<"bind" | "create">("bind");
+  const [action, setAction] = useState<Action>("bind");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [identity, setIdentity] = useState<{ email?: string | null }>({});
+  const [identity, setIdentity] = useState<{
+    valid: boolean;
+    email?: string | null;
+  }>({ valid: false });
+  const toast = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    api
+    authApi
       .ssoLinkStatus()
       .then((status) => {
         if (!status.valid) {
@@ -25,68 +35,78 @@ export function SsoLinkPage() {
       .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      await api.ssoLink(action, username, password);
+  const linkAction = useAsyncAction(
+    async (act: Action, name: string, pass: string) => {
+      await authApi.ssoLink({ action: act, username: name, password: pass });
+      toast.success("已关联 SSO 身份并登录");
       navigate("/", { replace: true });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "关联失败");
-    }
-  };
+    },
+    {
+      onError: (err) =>
+        toast.error(err instanceof Error ? err.message : "关联失败"),
+    },
+  );
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await linkAction.run(action, username, password);
+  }
+
+  if (!identity.valid) return null;
 
   return (
-    <AuthShell>
-      <p className="mb-4 text-sm text-muted">
-        SSO 身份 {identity.email ? `（${identity.email}）` : ""}尚未绑定本地账号，请选择：
-      </p>
-      <div className="mb-4 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          className={`btn ${action === "bind" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setAction("bind")}
-        >
-          绑定已有账号
-        </button>
-        <button
-          type="button"
-          className={`btn ${action === "create" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setAction("create")}
-        >
-          新建账号
-        </button>
-      </div>
-      <form onSubmit={submit} className="space-y-4">
-        {error ? <div className="badge badge-danger w-full justify-center py-2">{error}</div> : null}
-        <div>
-          <label className="label" htmlFor="link-username">用户名</label>
+    <AuthShell title="关联 SSO 身份" subtitle="绑定已有账号，或创建新账号">
+      <form onSubmit={handleSubmit} className="animate-fade-up space-y-4">
+        <Notice intent="info">
+          SSO 身份{identity.email ? `（${identity.email}）` : ""}尚未绑定本地账号。
+          绑定已有账号需验证本地密码，防止身份被他人占用。
+        </Notice>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className={`btn ${action === "bind" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setAction("bind")}
+          >
+            绑定已有账号
+          </button>
+          <button
+            type="button"
+            className={`btn ${action === "create" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setAction("create")}
+          >
+            新建账号
+          </button>
+        </div>
+        <label className="block">
+          <span className="label">用户名</span>
           <input
-            id="link-username"
-            className="input"
+            type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            className="input"
             autoComplete="username"
             required
           />
-        </div>
-        <div>
-          <label className="label" htmlFor="link-password">
+        </label>
+        <label className="block">
+          <span className="label">
             {action === "bind" ? "本地账号密码" : "设置密码（至少 8 位）"}
-          </label>
-          <input
-            id="link-password"
-            type="password"
-            className="input"
+          </span>
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="input"
             autoComplete={action === "bind" ? "current-password" : "new-password"}
             required
           />
-        </div>
-        <button type="submit" className="btn btn-primary w-full">
+        </label>
+        <AsyncButton
+          type="submit"
+          status={linkAction.status}
+          className="btn btn-primary w-full"
+        >
           {action === "bind" ? "绑定并登录" : "创建并登录"}
-        </button>
+        </AsyncButton>
       </form>
     </AuthShell>
   );

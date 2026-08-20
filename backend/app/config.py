@@ -26,6 +26,7 @@ def _env_int(name: str, default: int) -> int:
 class Settings:
     data_dir: Path
     secret_key: str
+    environment: str
     public_mode: bool
     cookie_secure: bool
     session_days: int
@@ -67,6 +68,7 @@ def load_settings(overrides: dict | None = None) -> Settings:
     return Settings(
         data_dir=data_dir,
         secret_key=secret_key,
+        environment=val("environment", "ENVIRONMENT", "development") or "development",
         public_mode=flag("public_mode", "PANEL_PUBLIC_MODE", True),
         cookie_secure=flag("cookie_secure", "PANEL_COOKIE_SECURE", False),
         session_days=_env_int("PANEL_SESSION_DAYS", 30)
