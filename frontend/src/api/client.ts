@@ -162,6 +162,19 @@ export const linksApi = {
     }),
 };
 
+export const tagsApi = {
+  list: () => api<{ name: string; count: number }[]>("/api/tags"),
+  rename: (tag: string, name: string) =>
+    api<{ renamed: number }>(`/api/tags/${encodeURIComponent(tag)}`, {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    }),
+  remove: (tag: string) =>
+    api<{ removed: number }>(`/api/tags/${encodeURIComponent(tag)}`, {
+      method: "DELETE",
+    }),
+};
+
 export const settingsApi = {
   site: () => api<SiteSettings>("/api/site-settings"),
   updateSite: (

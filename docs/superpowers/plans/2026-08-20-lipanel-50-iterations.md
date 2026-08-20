@@ -142,5 +142,6 @@
 - ✅ V13（分组图标与配色）：2026-08-21 完成。内置 10 个线框图标（零外部依赖）+ 管理页图标选择 + 面板/访客稳定色相瓦片。pytest 48 passed；Playwright 端到端：图标保存并显示。
 - ✅ V14（链接图标自动抓取）：2026-08-21 完成。`POST /api/links/{id}/fetch-icon` 受控抓取（`PANEL_LINK_ICON_FETCH` 开关、5s 超时、并发 ≤4、60s 缓存、≤1MB、类型白名单、HTML icon 解析 + /favicon.ico 回退、SSRF 仅 http/https）；管理页「抓图标」按钮；`/favicons/{name}` 严格文件名白名单。pytest 53 passed；本地 fixture + Playwright 端到端通过。
 - ✅ V15（批量操作）：2026-08-21 完成。`batch-delete/move/visibility` 三接口（全量 user_id 校验、空列表 422）+ 管理页链接表多选、全选、批量操作栏与确认弹窗。pytest 59 passed；Playwright 端到端：勾选 2 项批量设公开成功。
-- ⬜ V16–V50：待执行；每版独立提交。
+- ✅ V16（标签管理页）：2026-08-21 完成。`GET /api/tags` 统计、`PUT/DELETE /api/tags/{tag}` 重命名/删除（全量更新、去重保序、用户隔离、URL 编码中文标签）；管理页「标签管理」标签页（列表/计数/行内重命名/删除确认）。pytest 65 passed；Playwright 端到端：重命名 代码→工程 成功。
+- ⬜ V17–V50：待执行；每版独立提交。
 - 2026-08-21 备注：V24 时钟小组件与 V25 问候（前端部分）已随显示优化在 `codex/frontend-display` 先行落地（分支名非 `codex/50-iterations`，未计入版本序列）；V25 的「今天」常用入口未做，V11–V23 与 V25 剩余项仍待执行。

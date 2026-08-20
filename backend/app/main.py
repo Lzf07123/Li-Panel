@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.brand_defaults import seed_site_defaults
 from app.config import Settings, load_settings
 from app.db import connect, init_schema
-from app.routers import auth, groups, links, panel, setup, sso
+from app.routers import auth, groups, links, panel, setup, sso, tags
 from app.routers import settings as settings_router
 from app.security import RateLimiter
 
@@ -90,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(links.router)
     app.include_router(panel.router)
     app.include_router(settings_router.router)
+    app.include_router(tags.router)
 
     if (FRONTEND_DIST / "assets").exists():
         app.mount(

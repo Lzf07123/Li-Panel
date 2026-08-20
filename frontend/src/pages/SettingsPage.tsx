@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { authApi, groupsApi, linksApi, settingsApi } from "../api/client";
+import { authApi, groupsApi, linksApi, settingsApi, tagsApi } from "../api/client";
 import type { GroupOut, LinkOut, MeOut, SiteSettings } from "../api/types";
 import { AppHeader } from "../components/AppHeader";
 import { AsyncButton } from "../components/AsyncButton";
@@ -16,11 +16,12 @@ import { GROUP_ICON_NAMES, GroupIcon, isGroupIconName } from "../components/Grou
 import type { GroupIconName } from "../components/GroupIcon";
 import { formatTags, parseTags } from "../lib/tags";
 
-type Tab = "site" | "manage" | "personal";
+type Tab = "site" | "manage" | "tags" | "personal";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "site", label: "站点信息" },
   { key: "manage", label: "快捷方式" },
+  { key: "tags", label: "标签管理" },
   { key: "personal", label: "个人设置" },
 ];
 
@@ -56,6 +57,10 @@ export function SettingsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchTargetGroup, setBatchTargetGroup] = useState("");
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [tags, setTags] = useState<{ name: string; count: number }[]>([]);
+  const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deleteTagName, setDeleteTagName] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
 
@@ -79,6 +84,12 @@ export function SettingsPage() {
           setLinks(l);
         })
         .catch(() => setError("加载数据失败"));
+    }
+    if (tab === "tags") {
+      tagsApi
+        .list()
+        .then(setTags)
+        .catch(() => setError("加载标签失败"));
     }
     if (tab === "personal") {
       settingsApi
@@ -161,6 +172,27 @@ export function SettingsPage() {
     },
     { onError: (err) => setError(err.message) },
   );
+
+  const renameTagAction = useAsyncAction(
+    async ({ oldName, newName }: { oldName: string; newName: string }) => {
+      await tagsApi.rename(oldName, newName);
+      setTags(await tagsApi.list());
+      setEditingTag(null);
+      setRenameValue("");
+      setLinks(await linksApi.list().catch(() => links));
+      toast.success(`标签「${oldName}」已重命名为「${newName}」`);
+    },
+    { onError: (err) => setError(err.message) },
+  );
+
+  const deleteTagAction = useAsyncAction(async () => {
+    if (deleteTagName === null) return;
+    await tagsApi.remove(deleteTagName);
+    setTags(await tagsApi.list());
+    setLinks(await linksApi.list().catch(() => links));
+    setDeleteTagName(null);
+    toast.success(`标签「${deleteTagName}」已删除`);
+  }, { onError: (err) => setError(err.message) });
 
   const batchDeleteAction = useAsyncAction(async () => {
     const count = selectedIds.size;
@@ -924,6 +956,97 @@ export function SettingsPage() {
               </div>
             ) : null}
 
+            {tab === "tags" ? (
+              <div className="card p-6">
+                <h2 className="mb-3 text-sm font-semibold text-foreground">
+                  标签（{tags.length}）
+                </h2>
+                {tags.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    还没有标签，给快捷方式添加标签后会显示在这里。
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {tags.map((tag) => (
+                      <li
+                        key={tag.name}
+                        className="flex flex-wrap items-center gap-2 py-2.5"
+                      >
+                        {editingTag === tag.name ? (
+                          <>
+                            <input
+                              className="input input-sm max-w-48"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  void renameTagAction.run({
+                                    oldName: tag.name,
+                                    newName: renameValue,
+                                  });
+                                }
+                                if (e.key === "Escape") {
+                                  setEditingTag(null);
+                                }
+                              }}
+                              aria-label="新标签名"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-primary h-8 px-3 text-xs"
+                              disabled={renameTagAction.status === "pending"}
+                              onClick={() =>
+                                void renameTagAction.run({
+                                  oldName: tag.name,
+                                  newName: renameValue,
+                                })
+                              }
+                            >
+                              保存
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost h-8 px-3 text-xs"
+                              onClick={() => setEditingTag(null)}
+                            >
+                              取消
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="badge badge-muted">{tag.name}</span>
+                            <span className="text-xs text-muted">
+                              {tag.count} 个快捷方式
+                            </span>
+                            <div className="ml-auto flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-ghost h-8 px-3 text-xs"
+                                onClick={() => {
+                                  setEditingTag(tag.name);
+                                  setRenameValue(tag.name);
+                                }}
+                              >
+                                重命名
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger h-8 px-3 text-xs"
+                                onClick={() => setDeleteTagName(tag.name)}
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+
             {tab === "personal" ? (
               <div className="card max-w-lg space-y-5 p-6">
                 <div>
@@ -983,6 +1106,15 @@ export function SettingsPage() {
           if (deleteGroupId !== null) void deleteGroupAction.run(deleteGroupId);
         }}
         onCancel={() => setDeleteGroupId(null)}
+      />
+      <ConfirmDialog
+        open={deleteTagName !== null}
+        title="删除标签"
+        message={`确定删除标签「${deleteTagName ?? ""}」？会从所有快捷方式中移除该标签。`}
+        confirmLabel="删除"
+        status={deleteTagAction.status}
+        onConfirm={() => void deleteTagAction.run()}
+        onCancel={() => setDeleteTagName(null)}
       />
       <ConfirmDialog
         open={batchDeleteOpen}
