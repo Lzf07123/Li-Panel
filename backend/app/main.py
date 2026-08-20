@@ -51,6 +51,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.db_path = settings.db_path
     app.state.uploads_dir = settings.uploads_dir
+    from app.security import LoginLockout
+
+    app.state.login_lockout = LoginLockout(
+        max_fails=settings.login_max_fails, lock_minutes=settings.login_lock_minutes
+    )
     app.state.login_limiter = RateLimiter(limit=10, window_seconds=60)
     app.state.setup_limiter = RateLimiter(limit=10, window_seconds=60)
     app.state.sso_limiter = RateLimiter(limit=10, window_seconds=60)

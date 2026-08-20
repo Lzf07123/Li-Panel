@@ -40,6 +40,8 @@ class Settings:
     health_check: bool
     sso_logout_redirects: tuple[str, ...]
     allowed_hosts: tuple[str, ...]
+    login_max_fails: int
+    login_lock_minutes: int
 
     @property
     def db_path(self) -> Path:
@@ -107,4 +109,10 @@ def load_settings(overrides: dict | None = None) -> Settings:
                 if part.strip()
             )
         ),
+        login_max_fails=int(o["login_max_fails"])
+        if "login_max_fails" in o
+        else _env_int("PANEL_LOGIN_MAX_FAILS", 5),
+        login_lock_minutes=int(o["login_lock_minutes"])
+        if "login_lock_minutes" in o
+        else _env_int("PANEL_LOGIN_LOCK_MINUTES", 15),
     )

@@ -29,12 +29,20 @@ def login(
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
     ip = request.client.host if request.client else "unknown"
+    settings = request.app.state.settings
     if not request.app.state.login_limiter.allow(ip):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+    lockout = request.app.state.login_lockout
+    if lockout.is_locked(body.username, ip):
+        raise HTTPException(
+            status_code=429,
+            detail=f"尝试次数过多，请 {settings.login_lock_minutes} 分钟后再试",
+        )
     user = get_user_by_username(conn, body.username)
     if user is None or not verify_password(body.password, user["password_hash"], user["salt"]):
+        lockout.record_failure(body.username, ip)
         raise HTTPException(status_code=401, detail="用户名或密码错误")
-    settings = request.app.state.settings
+    lockout.record_success(body.username, ip)
     token = create_session(conn, user["id"], session_days=settings.session_days)
     response.set_cookie(
         "lipanel_session",
