@@ -61,6 +61,7 @@ export function SettingsPage() {
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteTagName, setDeleteTagName] = useState<string | null>(null);
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
   const toast = useToast();
 
@@ -231,7 +232,7 @@ export function SettingsPage() {
     { onError: (err) => setError(err.message) },
   );
 
-  const saveLinkAction = useAsyncAction(async () => {
+  const saveLinkAction = useAsyncAction(async (force = false) => {
     const body = {
       name: linkForm.name,
       url_lan: linkForm.url_lan,
@@ -242,6 +243,7 @@ export function SettingsPage() {
       guest_url_mode: linkForm.guest_url_mode,
       open_mode: linkForm.open_mode,
       tags: linkForm.tags,
+      force,
     };
     if (linkForm.id === null) {
       await linksApi.create(body);
@@ -249,8 +251,18 @@ export function SettingsPage() {
       await linksApi.update(linkForm.id, body);
     }
     setLinkForm(emptyLinkForm);
+    setDuplicateNotice(null);
     setLinks(await linksApi.list());
     toast.success("快捷方式已保存");
+  }, {
+    onError: (err) => {
+      const e = err as Error & { code?: string };
+      if (e.code === "duplicate") {
+        setDuplicateNotice(e.message);
+      } else {
+        setError(e.message);
+      }
+    },
   });
 
   const toggleLinkAction = useAsyncAction(
@@ -767,6 +779,18 @@ export function SettingsPage() {
                     <option value="new_tab">新标签页打开</option>
                     <option value="modal">内置窗口打开</option>
                   </select>
+                  {duplicateNotice ? (
+                    <div className="sm:col-span-2">
+                      <Notice intent="warning">{duplicateNotice}</Notice>
+                      <button
+                        type="button"
+                        className="btn btn-ghost h-8 px-3 text-xs"
+                        onClick={() => void saveLinkAction.run(true)}
+                      >
+                        仍要保存
+                      </button>
+                    </div>
+                  ) : null}
                   <AsyncButton
                     type="submit"
                     status={saveLinkAction.status}
@@ -918,7 +942,7 @@ export function SettingsPage() {
                                 <button
                                   type="button"
                                   className="btn btn-ghost h-8 px-3 text-xs"
-                                  onClick={() =>
+                                  onClick={() => {
                                     setLinkForm({
                                       id: link.id,
                                       name: link.name,
@@ -933,8 +957,9 @@ export function SettingsPage() {
                                       guest_url_mode: link.guest_url_mode,
                                       open_mode: link.open_mode,
                                       tags: link.tags,
-                                    })
-                                  }
+                                    });
+                                    setDuplicateNotice(null);
+                                  }}
                                 >
                                   编辑
                                 </button>

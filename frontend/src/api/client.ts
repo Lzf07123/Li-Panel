@@ -44,6 +44,16 @@ async function api<T>(
     const body = (await response.json().catch(() => ({}))) as {
       detail?: unknown;
     };
+    if (
+      typeof body.detail === "object" &&
+      body.detail !== null &&
+      typeof (body.detail as { message?: unknown }).message === "string"
+    ) {
+      const detail = body.detail as { message: string; code?: string };
+      const error = new Error(detail.message) as Error & { code?: string };
+      error.code = detail.code;
+      throw error;
+    }
     if (typeof body.detail === "string") {
       throw new Error(body.detail);
     }

@@ -38,6 +38,7 @@ class LinkIn(BaseModel):
     guest_url_mode: Literal["hidden", "show"] = "hidden"
     sort_order: int = 0
     open_mode: Literal["new_tab", "modal"] = "new_tab"
+    force: bool = False
 
     _url_lan = field_validator("url_lan")(_validate_http_url)
     _url_wan = field_validator("url_wan")(_validate_http_url)
@@ -188,6 +189,36 @@ def list_links(
     return [_link_dict(r) for r in rows]
 
 
+def _check_duplicate(
+    conn: sqlite3.Connection,
+    user_id: int,
+    name: str,
+    url_lan: str,
+    exclude_id: int | None = None,
+) -> None:
+    for row in conn.execute(
+        "SELECT id, name, url_lan FROM links WHERE user_id = ?", (user_id,)
+    ).fetchall():
+        if row["id"] == exclude_id:
+            continue
+        if row["name"].strip().lower() == name.strip().lower():
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "duplicate",
+                    "message": f"已存在同名快捷方式「{row['name']}」",
+                },
+            )
+        if row["url_lan"] == url_lan:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "duplicate",
+                    "message": f"已存在相同地址的快捷方式「{row['name']}」",
+                },
+            )
+
+
 @router.post("", status_code=201)
 def create_link(
     body: LinkIn,
@@ -195,6 +226,8 @@ def create_link(
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
     _check_group(conn, body.group_id, user["id"])
+    if not body.force:
+        _check_duplicate(conn, user["id"], body.name, body.url_lan)
     cur = conn.execute(
         "INSERT INTO links (user_id, group_id, name, url_lan, url_wan, icon_type, "
         "icon_value, description, tags, is_public, guest_url_mode, sort_order, open_mode) "
@@ -227,6 +260,8 @@ def update_link(
 ) -> dict:
     _owned_link(conn, lid, user["id"])
     _check_group(conn, body.group_id, user["id"])
+    if not body.force:
+        _check_duplicate(conn, user["id"], body.name, body.url_lan, exclude_id=lid)
     conn.execute(
         "UPDATE links SET group_id = ?, name = ?, url_lan = ?, url_wan = ?, "
         "icon_type = ?, icon_value = ?, description = ?, tags = ?, is_public = ?, "
