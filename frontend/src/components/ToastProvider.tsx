@@ -44,13 +44,16 @@ const EXIT_MS = 220;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const { t } = useI18n();
-  const DEFAULT_TITLES: Record<ToastType, string> = {
-    success: t("操作成功"),
-    error: t("出错了"),
-    warning: t("请注意"),
-    info: t("提示"),
-    loading: t("处理中"),
-  };
+  const DEFAULT_TITLES = useMemo<Record<ToastType, string>>(
+    () => ({
+      success: t("操作成功"),
+      error: t("出错了"),
+      warning: t("请注意"),
+      info: t("提示"),
+      loading: t("处理中"),
+    }),
+    [t],
+  );
   const nextId = useRef(1);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const exitTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -114,7 +117,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       }
       return id;
     },
-    [dismiss],
+    [dismiss, DEFAULT_TITLES],
   );
 
   const api = useMemo<ToastApi>(
