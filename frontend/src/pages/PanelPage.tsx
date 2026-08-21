@@ -72,8 +72,21 @@ export function PanelPage() {
     meRef.current = me;
   }, [me]);
 
-  /** 站点连接检测由用户侧发起：refresh=true 强制重新检测（忽略服务端缓存）。 */
+  /** 站点连接检测由用户侧发起：refresh=true 强制重新检测（忽略服务端缓存）。
+
+      强制检测节流 60s（与服务端缓存 TTL 一致）：窗口聚焦/标签页恢复可见会频繁触发，
+      若每次都强制出站检测，慢链接多时会拖垮面板（状态点转圈/失败）。
+      60s 内重复触发降级为普通请求，直接命中服务端缓存。 */
+  const lastForcedHealth = useRef(0);
   const loadHealth = useCallback((refresh: boolean) => {
+    const now = Date.now();
+    if (refresh) {
+      if (now - lastForcedHealth.current < 60_000) {
+        refresh = false;
+      } else {
+        lastForcedHealth.current = now;
+      }
+    }
     const target = meRef.current
       ? healthApi.links(refresh)
       : healthApi.status(refresh);

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
@@ -22,6 +24,9 @@ MAX_WORKERS = 4
 SAMPLE_INTERVAL_MINUTES = 10
 HISTORY_HOURS = 24
 MAX_HISTORY_ROWS = 144
+# 强制检测节流窗口：refresh=true 每用户/IP 30s 内最多执行一次，
+# 防止多标签页/多设备反复强制出站检测拖垮面板（前端另有 60s 节流兜底）。
+FORCE_REFRESH_WINDOW = 30.0
 
 LINK_COLS = (
     "id, name, url_lan, url_wan, health_enabled, health_interval, "
@@ -35,6 +40,21 @@ def _effective_url(link: sqlite3.Row) -> str:
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+_refresh_last: dict[str, float] = {}
+_refresh_lock = threading.Lock()
+
+
+def _allow_force_refresh(key: str, window: float = FORCE_REFRESH_WINDOW) -> bool:
+    """窗口内仅首次 refresh=true 放行，其余降级为走缓存。"""
+    now = time.monotonic()
+    with _refresh_lock:
+        last = _refresh_last.get(key, 0.0)
+        if now - last < window:
+            return False
+        _refresh_last[key] = now
+        return True
 
 
 def _check_many(
@@ -98,6 +118,8 @@ def health_links(
         f"SELECT {LINK_COLS} FROM links WHERE user_id = ? AND health_enabled = 1",
         (user["id"],),
     ).fetchall()
+    if refresh and not _allow_force_refresh(f"user:{user['id']}"):
+        refresh = False
     results = _check_many(links, refresh=refresh)
     _record_samples(conn, user["id"], results, links)
     return {"enabled": True, "results": results}
@@ -119,6 +141,10 @@ def public_status(
     links = conn.execute(
         f"SELECT {LINK_COLS} FROM links WHERE is_public = 1 AND health_enabled = 1"
     ).fetchall()
+    if refresh:
+        ip = request.client.host if request.client else "unknown"
+        if not _allow_force_refresh(f"ip:{ip}"):
+            refresh = False
     return {"enabled": True, "results": _check_many(links, refresh=refresh)}
 
 

@@ -518,3 +518,45 @@ def test_health_refresh_bypasses_cache(client, auth_headers, health_server):
     assert REQUESTS["count"] == first  # 60s 缓存内不重复出站
     client.get("/api/health/links?refresh=1", headers=auth_headers)
     assert REQUESTS["count"] > first  # 用户侧强制刷新会重新检测
+
+
+def test_allow_force_refresh_window():
+    from app.routers import health as health_router
+
+    with health_router._refresh_lock:
+        health_router._refresh_last.clear()
+    assert health_router._allow_force_refresh("k1") is True
+    assert health_router._allow_force_refresh("k1") is False
+    assert health_router._allow_force_refresh("k2") is True
+
+
+def test_health_links_refresh_throttled(client, auth_headers, monkeypatch):
+    """30s 窗口内第二次 refresh=1 不再强制出站检测（走缓存），防止焦点切换刷爆。"""
+    from app.routers import health as health_router
+
+    with health_router._refresh_lock:
+        health_router._refresh_last.clear()
+
+    lid = client.post(
+        "/api/links",
+        json={"name": "状态", "url_lan": "https://example.com"},
+        headers=auth_headers,
+    ).json()["id"]
+    calls: list[str] = []
+
+    def fake_check(url, timeout=5.0):
+        calls.append(url)
+        return "up", 12
+
+    monkeypatch.setattr(health_router, "check_url", fake_check)
+
+    r1 = client.get("/api/health/links?refresh=1", headers=auth_headers)
+    assert r1.status_code == 200
+    assert len(calls) == 1
+    assert r1.json()["results"][0]["status"] == "up"
+
+    # 30s 窗口内再次 refresh=1：节流降级，命中 60s 缓存，不再出站
+    r2 = client.get("/api/health/links?refresh=1", headers=auth_headers)
+    assert r2.status_code == 200
+    assert len(calls) == 1, "第二次 refresh=1 不应再强制检测"
+    assert r2.json()["results"][0]["link_id"] == lid
