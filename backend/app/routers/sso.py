@@ -184,6 +184,9 @@ def sso_login(request: Request, conn: sqlite3.Connection = Depends(get_db)):
     settings = request.app.state.settings
     if not settings.oidc_enabled:
         raise HTTPException(status_code=404, detail="SSO 未启用")
+    ip = request.client.host if request.client else "unknown"
+    if not request.app.state.sso_limiter.allow(ip):
+        return _sso_error_redirect("请求过于频繁，请稍后再试")
     client = oidc.OIDCClient(settings)
     state, nonce = new_token(16), new_token(16)
     verifier, challenge = oidc.generate_pkce()
@@ -197,6 +200,12 @@ def sso_login(request: Request, conn: sqlite3.Connection = Depends(get_db)):
         "INSERT INTO sso_flows (token, state, nonce, code_verifier, expires_at) "
         "VALUES (?, ?, ?, ?, ?)",
         (flow_token, state, nonce, verifier, _fmt(expires)),
+    )
+    # 滚动清理：过期流程立删；已消费流程保留 1 天后清理（防表无限增长）
+    conn.execute(
+        "DELETE FROM sso_flows WHERE expires_at < ? "
+        "OR (consumed = 1 AND created_at < ?)",
+        (_fmt(_now()), _fmt(_now() - timedelta(days=1))),
     )
     response = RedirectResponse(url, status_code=302)
     response.set_cookie(

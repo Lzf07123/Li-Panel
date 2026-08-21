@@ -31,3 +31,19 @@ def test_allowed_host_wildcard(tmp_path):
 def test_allowed_hosts_empty_allow_all(tmp_path):
     c = _app_with(tmp_path, ())
     assert c.get("/api/health", headers={"Host": "whatever.example"}).status_code == 200
+
+
+def test_allowed_host_ipv6_literal(tmp_path):
+    c = _app_with(tmp_path, ("::1",))
+    assert c.get("/api/health", headers={"Host": "[::1]:8000"}).status_code == 200
+    assert c.get("/api/health", headers={"Host": "[::2]:8000"}).status_code == 403
+
+
+def test_allowed_host_wildcard_ignores_port(tmp_path):
+    c = _app_with(tmp_path, ("*.example.com",))
+    assert (
+        c.get("/api/health", headers={"Host": "a.example.com:8443"}).status_code == 200
+    )
+    assert (
+        c.get("/api/health", headers={"Host": "b.example.net:8443"}).status_code == 403
+    )

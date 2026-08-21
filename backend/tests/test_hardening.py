@@ -122,3 +122,60 @@ def test_startup_unwritable_data_dir_gives_actionable_error(tmp_path):
             )
     finally:
         os.chmod(data_dir, 0o700)
+
+
+def test_host_cookie_requires_secure(tmp_path):
+    """上线前修复：__Host- 前缀 Cookie 必须 Secure，否则启动报错。"""
+    import pytest
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    with pytest.raises(RuntimeError):
+        create_app(
+            load_settings(
+                overrides={
+                    "data_dir": str(tmp_path),
+                    "secret_key": "x",
+                    "host_cookie": True,
+                    "cookie_secure": False,
+                }
+            )
+        )
+    # 合法组合可启动
+    app = create_app(
+        load_settings(
+            overrides={
+                "data_dir": str(tmp_path),
+                "secret_key": "x",
+                "host_cookie": True,
+                "cookie_secure": True,
+            }
+        )
+    )
+    assert TestClient(app).get("/api/health").status_code == 200
+
+
+def test_uploads_traversal_name_rejected(client):
+    """上线前修复：/uploads 文件名必须为单段安全字符，拒绝编码斜杠/路径穿越。"""
+    for path in [
+        "/uploads/..%2F..%2Fetc%2Fpasswd.png",
+        "/uploads/%2e%2e%2f%2e%2e%2fetc%2fpasswd.png",
+        "/uploads/a%2Fb.png",
+        "/uploads/..%2Fdata%2Fpanel.db.png",
+    ]:
+        r = client.get(path)
+        assert r.status_code == 404, f"{path} 应 404，实际 {r.status_code}"
+
+
+def test_uploads_uploaded_file_served(client, auth_headers):
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 16
+    r = client.post(
+        "/api/uploads",
+        files={"file": ("real.png", io.BytesIO(png), "image/png")},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    url = r.json()["url"]
+    assert client.get(url).status_code == 200

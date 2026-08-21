@@ -115,7 +115,7 @@ export const enUS: Record<string, string> = {
   "标签管理": "Tags",
   "个人设置": "Profile",
   "站点名称": "Site name",
-  "slogan": "Slogan",
+  "标语": "Slogan",
   "描述": "Description",
   "版权行": "Copyright line",
   "备案号": "ICP filing",

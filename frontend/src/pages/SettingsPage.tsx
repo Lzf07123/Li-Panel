@@ -185,7 +185,7 @@ export function SettingsPage() {
         .then(setSessions)
         .catch(() => setSessions([]));
     }
-  }, [tab]);
+  }, [tab, setLang]);
 
   const saveSiteAction = useAsyncAction(
     async (patch: Parameters<typeof settingsApi.updateSite>[0]) => {
@@ -603,7 +603,7 @@ export function SettingsPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="label">{t("slogan")}</span>
+                    <span className="label">{t("标语")}</span>
                     <input
                       className="input"
                       value={site.slogan}

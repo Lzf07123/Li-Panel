@@ -201,7 +201,7 @@ export function PanelPage() {
   const flatLinks = useMemo(() => {
     const items: { link: LinkOut; id: string }[] = [];
     for (const group of groups) {
-      if (isGroupCollapsed(group.id)) continue;
+      if (!searching && collapsedGroups.has(group.id)) continue;
       for (const link of group.links) {
         items.push({ link, id: `panel-link-${items.length}` });
       }

@@ -27,6 +27,19 @@ FRONTEND_DIST = next(
     PROJECT_ROOT / "frontend" / "dist",
 )
 
+def _netloc_key(parsed) -> str:
+    """Origin/Host 归一化键：host:port，默认端口（80/443）等价于无端口。
+
+    用于 CSRF Origin 校验：比较完整 host+port，堵住「同 host 不同端口」缺口，
+    同时避免 HTTPS 部署下 Host 带 :443 而 Origin 不带端口的误拒。
+    """
+    hostname = parsed.hostname or ""
+    port = parsed.port
+    if port in (None, 80, 443):
+        return hostname
+    return f"{hostname}:{port}"
+
+
 def _build_csp(settings: Settings) -> str:
     """构造 CSP：生产禁用内联样式；开发保留以支撑前端动效的内联样式（与参考实现一致）。"""
     style_src = (
@@ -44,6 +57,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     if settings.environment == "production" and len(settings.secret_key) < 32:
         raise RuntimeError("PANEL_SECRET_KEY 长度必须 ≥ 32 字符（生产环境）")
+    if settings.host_cookie and not settings.cookie_secure:
+        raise RuntimeError(
+            "PANEL_HOST_COOKIE=true 时必须同时设置 PANEL_COOKIE_SECURE=true"
+            "（__Host- 前缀 Cookie 强制要求 Secure 属性）"
+        )
     app = FastAPI(
         title="Li&Panel",
         docs_url=None if settings.environment == "production" else "/docs",
@@ -79,7 +97,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def _host_allowed(host: str) -> bool:
         if not settings.allowed_hosts:
             return True
-        hostname = host.split(":")[0]
+        # "//" 前缀使 urlparse 支持无 scheme 的 Host 头，并正确解析 IPv6 字面量 [::1]:port
+        parsed = urlparse("//" + host)
+        hostname = parsed.hostname or ""
         for allowed in settings.allowed_hosts:
             if allowed == hostname:
                 return True
@@ -94,9 +114,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if request.method in {"POST", "PUT", "DELETE", "PATCH"}:
             origin = request.headers.get("origin")
             if origin:
-                origin_host = urlparse(origin).hostname
-                host = request.headers.get("host", "").split(":")[0]
-                if origin_host != host:
+                parsed_origin = urlparse(origin)
+                parsed_host = urlparse("//" + (request.headers.get("host") or ""))
+                if (
+                    parsed_origin.scheme not in {"http", "https"}
+                    or not parsed_origin.hostname
+                    or not parsed_host.hostname
+                    or _netloc_key(parsed_origin) != _netloc_key(parsed_host)
+                ):
                     return JSONResponse(
                         {"error": "跨域请求被拒绝"}, status_code=403
                     )
@@ -119,6 +144,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers["cache-control"] = (
                 "public, max-age=31536000, immutable"
             )
+        elif "text/html" in response.headers.get("content-type", ""):
+            # SPA 入口：不缓存，保证发版后立即拿到新 index（资源本身已 immutable）
+            response.headers["cache-control"] = "no-cache"
         response.headers["x-panel-version"] = VERSION
         return response
 

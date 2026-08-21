@@ -20,6 +20,8 @@ router = APIRouter(tags=["settings"])
 
 ALLOWED_UPLOAD_EXTS = {"webp", "png", "jpg", "jpeg", "gif"}
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+# 与 /favicons 一致：文件名仅允许单段安全字符，拒绝编码斜杠/路径穿越（纵深防御）
+UPLOAD_NAME_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 SITE_KEYS = {
     "site_name",
@@ -203,7 +205,11 @@ def favicon_file(request: Request, name: str) -> FileResponse:
 
 @router.get("/uploads/{name}")
 def uploaded_file(request: Request, name: str) -> FileResponse:
-    if "." not in name or name.rsplit(".", 1)[1].lower() not in ALLOWED_UPLOAD_EXTS:
+    if (
+        not UPLOAD_NAME_RE.fullmatch(name)
+        or "." not in name
+        or name.rsplit(".", 1)[1].lower() not in ALLOWED_UPLOAD_EXTS
+    ):
         raise HTTPException(status_code=404, detail="文件不存在")
     path = request.app.state.settings.uploads_dir / name
     if not path.is_file():
