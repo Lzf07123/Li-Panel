@@ -5,6 +5,7 @@ import { authApi, healthApi, linksApi, panelApi, rssApi } from "../api/client";
 import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
+import { matches } from "../lib/filters";
 import { AppHeader } from "../components/AppHeader";
 import {
   CLIENT_PROBE_INTERVAL_MS,
@@ -30,17 +31,6 @@ import { FloatingBackground } from "../components/FloatingBackground";
 import { TechAmbience } from "../components/bits/TechAmbience";
 import { useToast } from "../hooks/useToast";
 import { useI18n } from "../lib/i18n";
-
-export function matches(link: LinkOut, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return (
-    link.name.toLowerCase().includes(q) ||
-    link.description.toLowerCase().includes(q) ||
-    link.tags.some((tag) => tag.toLowerCase().includes(q)) ||
-    (link.url ?? "").toLowerCase().includes(q)
-  );
-}
 
 export function PanelPage() {
   const [panel, setPanel] = useState<PanelOut | null>(null);

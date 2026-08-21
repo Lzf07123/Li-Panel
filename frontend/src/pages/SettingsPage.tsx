@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { authApi, backupApi, groupsApi, linksApi, rssApi, sessionsApi, settingsApi, ssoApi, tagsApi } from "../api/client";
 import type { GroupOut, LinkOut, MeOut, SiteSettings } from "../api/types";
@@ -17,6 +17,12 @@ import { useToast } from "../hooks/useToast";
 import { GROUP_ICON_NAMES, isGroupIconName } from "../components/GroupIcon";
 import type { GroupIconName } from "../components/GroupIcon";
 import { formatTags, parseTags } from "../lib/tags";
+import {
+  passesManageFilters,
+  type ManageGroup,
+  type ManageHealthEnabled,
+  type ManageVisibility,
+} from "../lib/filters";
 import {
   APP_VERSION,
   ICP_FILING_ICON_ENV,
@@ -58,7 +64,39 @@ export function SettingsPage() {
   const [me, setMe] = useState<MeOut | null>(null);
   const [site, setSite] = useState<SiteSettings | null>(null);
   const [groups, setGroups] = useState<GroupOut[]>([]);
+  // 后台快捷方式筛选（2026-08-22）
+  const [manageQuery, setManageQuery] = useState("");
+  const [manageGroup, setManageGroup] = useState<ManageGroup>("all");
+  const [manageVisibility, setManageVisibility] = useState<ManageVisibility>("all");
+  const [manageHealth, setManageHealth] = useState<ManageHealthEnabled>("all");
+  const [manageTags, setManageTags] = useState<ReadonlySet<string>>(new Set());
   const [links, setLinks] = useState<LinkOut[]>([]);
+  const manageFilteredLinks = useMemo(
+    () =>
+      links.filter((link) =>
+        passesManageFilters(link, {
+          query: manageQuery,
+          tags: manageTags,
+          group: manageGroup,
+          visibility: manageVisibility,
+          healthEnabled: manageHealth,
+        }),
+      ),
+    [links, manageQuery, manageTags, manageGroup, manageVisibility, manageHealth],
+  );
+  const manageAllTags = useMemo(
+    () =>
+      Array.from(new Set(links.flatMap((link) => link.tags))).sort((a, b) =>
+        a.localeCompare(b, "zh-CN"),
+      ),
+    [links],
+  );
+  const manageFiltering =
+    Boolean(manageQuery.trim()) ||
+    manageTags.size > 0 ||
+    manageGroup !== "all" ||
+    manageVisibility !== "all" ||
+    manageHealth !== "all";
   const [linkMode, setLinkMode] = useState("lan");
   const [linkForm, setLinkForm] = useState(emptyLinkForm);
   const [newGroupName, setNewGroupName] = useState("");
@@ -1221,7 +1259,8 @@ export function SettingsPage() {
                 <div className="card p-6">
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-foreground">
-                      {t("快捷方式")}（{links.length}）
+                      {t("快捷方式")}（{manageFilteredLinks.length}
+                      {manageFiltering ? `/${links.length}` : ""}）
                     </h2>
                     <button
                       type="button"
@@ -1231,6 +1270,150 @@ export function SettingsPage() {
                     >
                       {t("补抓缺失图标")}
                     </button>
+                  </div>
+                  <div className="mb-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative min-w-52 flex-1">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+                          aria-hidden="true"
+                        >
+                          <circle cx="11" cy="11" r="7" />
+                          <path d="m20 20-3.5-3.5" />
+                        </svg>
+                        <input
+                          type="search"
+                          className="input pl-8"
+                          placeholder={t("搜索名称、地址、标签…")}
+                          aria-label="搜索快捷方式"
+                          value={manageQuery}
+                          onChange={(e) => setManageQuery(e.target.value)}
+                        />
+                      </div>
+                      <select
+                        className="input input-sm w-auto"
+                        aria-label={t("按分组筛选")}
+                        value={
+                          manageGroup === "all"
+                            ? "all"
+                            : manageGroup === "ungrouped"
+                              ? "ungrouped"
+                              : String(manageGroup)
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setManageGroup(
+                            v === "all"
+                              ? "all"
+                              : v === "ungrouped"
+                                ? "ungrouped"
+                                : Number(v),
+                          );
+                        }}
+                      >
+                        <option value="all">{t("全部分组")}</option>
+                        {groups.map((group) => (
+                          <option key={group.id} value={String(group.id)}>
+                            {group.name}
+                          </option>
+                        ))}
+                        {links.some((link) => link.group_id === null) ? (
+                          <option value="ungrouped">{t("未分组")}</option>
+                        ) : null}
+                      </select>
+                      <select
+                        className="input input-sm w-auto"
+                        aria-label={t("按可见性筛选")}
+                        value={manageVisibility}
+                        onChange={(e) =>
+                          setManageVisibility(
+                            e.target.value as ManageVisibility,
+                          )
+                        }
+                      >
+                        <option value="all">{t("全部")}</option>
+                        <option value="public">{t("公开")}</option>
+                        <option value="private">{t("私密")}</option>
+                      </select>
+                      <select
+                        className="input input-sm w-auto"
+                        aria-label={t("按健康检测筛选")}
+                        value={manageHealth}
+                        onChange={(e) =>
+                          setManageHealth(e.target.value as ManageHealthEnabled)
+                        }
+                      >
+                        <option value="all">{t("全部")}</option>
+                        <option value="enabled">{t("启用检测")}</option>
+                        <option value="disabled">{t("关闭检测")}</option>
+                      </select>
+                      {manageFiltering ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost h-8 px-3 text-xs"
+                          onClick={() => {
+                            setManageQuery("");
+                            setManageGroup("all");
+                            setManageVisibility("all");
+                            setManageHealth("all");
+                            setManageTags(new Set());
+                          }}
+                        >
+                          {t("清除筛选")}
+                        </button>
+                      ) : null}
+                    </div>
+                    {manageAllTags.length > 0 ? (
+                      <div
+                        role="group"
+                        aria-label="按标签筛选"
+                        className="flex flex-wrap items-center gap-1.5"
+                      >
+                        <button
+                          type="button"
+                          aria-pressed={manageTags.size === 0}
+                          className={`badge cursor-pointer border ${
+                            manageTags.size === 0
+                              ? "badge-primary"
+                              : "badge-muted"
+                          }`}
+                          onClick={() => setManageTags(new Set())}
+                        >
+                          {t("全部")}
+                        </button>
+                        {manageAllTags.map((tag) => {
+                          const active = manageTags.has(tag);
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              aria-pressed={active}
+                              className={`badge cursor-pointer border ${
+                                active ? "badge-primary" : "badge-muted"
+                              }`}
+                              onClick={() =>
+                                setManageTags((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(tag)) {
+                                    next.delete(tag);
+                                  } else {
+                                    next.add(tag);
+                                  }
+                                  return next;
+                                })
+                              }
+                            >
+                              {tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="table-shell overflow-x-auto">
                     <table>
@@ -1242,13 +1425,15 @@ export function SettingsPage() {
                               aria-label="全选快捷方式"
                               className="h-4 w-4 accent-primary"
                               checked={
-                                links.length > 0 &&
-                                selectedIds.size === links.length
+                                manageFilteredLinks.length > 0 &&
+                                selectedIds.size === manageFilteredLinks.length
                               }
                               onChange={(e) =>
                                 setSelectedIds(
                                   e.target.checked
-                                    ? new Set(links.map((l) => l.id))
+                                    ? new Set(
+                                        manageFilteredLinks.map((l) => l.id),
+                                      )
                                     : new Set(),
                                 )
                               }
@@ -1261,7 +1446,17 @@ export function SettingsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {links.map((link) => (
+                        {manageFilteredLinks.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={5}
+                              className="px-4 py-6 text-center text-sm text-muted"
+                            >
+                              {t("没有找到匹配的快捷方式")}
+                            </td>
+                          </tr>
+                        ) : null}
+                        {manageFilteredLinks.map((link) => (
                           <tr
                             key={link.id}
                             className={selectedIds.has(link.id) ? "bg-primary-soft/60" : ""}
