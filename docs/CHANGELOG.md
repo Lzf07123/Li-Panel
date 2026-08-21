@@ -20,6 +20,15 @@
 - **总超时预算**：`fetch_favicon` 支持 `total_budget`（默认 25s），候选递归与父域兜底共享 deadline，慢站点不再无限叠加超时。
 - 验证：pytest 205 passed（+3：响应不阻塞/过期 deadline 不再发请求/预算传递）；端到端实测连续创建 8 个慢抓取链接 0.04s、登出 0.00s、再添加 0.00s。
 
+### CSRF 校验兼容反代端口剥离（2026-08-22，修复公网 IP:端口访问下登出/添加 403）
+
+- **根因**：上一轮 CSRF 加强为「完整 host+port 比较」，但 nginx `proxy_set_header Host $host` 会**剥离端口**（`$host` 不含端口）；公网以 `http://IP:8000` 访问时，浏览器 Origin 带 `:8000` 而后端收到无端口 Host → netloc 不匹配 → 所有写请求（登出/添加链接等）403。
+- **修复**：`X-Forwarded-Host` 存在时按完整 netloc 严格校验（堵同 host 不同端口）；未透传时回退 hostname 比较（兼容现有 nginx 配置，SameSite=Lax 兜底）。
+- **nginx**：`proxy_set_header X-Forwarded-Host $http_host;` 透传原始 Host（含端口），让新部署启用严格模式。
+- 验证：pytest 207 passed（+2）；端到端实测 Host 无端口 + Origin 带端口 → 建组/建链/登出全部放行，X-Forwarded-Host 不同端口仍 403。
+- 部署提示：仅更新后端容器即可恢复（回退 hostname 比较）；重建 nginx 容器后启用严格模式。
+
+
 
 ### 超长 URL 显示修复（2026-08-22）
 
