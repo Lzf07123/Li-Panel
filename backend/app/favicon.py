@@ -23,6 +23,7 @@ import httpx
 ICON_CONTENT_TYPES = {
     "image/png": "png",
     "image/jpeg": "jpg",
+    "image/gif": "gif",
     "image/webp": "webp",
     "image/x-icon": "ico",
     "image/vnd.microsoft.icon": "ico",
@@ -32,7 +33,8 @@ DATA_URI_B64_RE = re.compile(
     r"^data:image/(png|jpeg|webp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,(.+)$",
     re.IGNORECASE,
 )
-MAX_ICON_BYTES = 1_048_576  # 1MB
+MAX_ICON_BYTES = 1_048_576  # 1MB（图标本体上限）
+MAX_PAGE_BYTES = 5 * 1_048_576  # 5MB（首页 HTML 解析候选上限，Cloudflare 首页约 1.3MB）
 MAX_MANIFEST_BYTES = 524_288  # 512KB
 FETCH_TIMEOUT = 5.0
 CACHE_TTL = 60.0
@@ -98,6 +100,30 @@ def _allowed_url(url: str) -> bool:
 def _ext_for(content_type: str) -> str | None:
     ctype = content_type.split(";")[0].strip().lower()
     return ICON_CONTENT_TYPES.get(ctype)
+
+
+def _sniff_ext(data: bytes) -> str | None:
+    """按魔数识别图片格式（不依赖 Content-Type）。
+
+    覆盖三类真实场景：
+    - Docker Hub：favicon.ico 以 application/octet-stream 返回（实际为 PNG）
+    - Cloudflare：favicon.ico 声明 image/x-icon 但内容实为 PNG
+    - 文本 SVG：无二进制魔数，按 <svg/<?xml 前缀识别
+    """
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "gif"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "webp"
+    if data.startswith(b"\x00\x00\x01\x00"):
+        return "ico"
+    head = data[:512].lstrip().lower()
+    if head.startswith((b"<svg", b"<?xml")):
+        return "svg"
+    return None
 
 
 def _ext_for_data_uri(mime: str) -> str | None:
@@ -249,18 +275,37 @@ def _download(
     except httpx.HTTPError:
         return None, None
     data = resp.content
-    if not data or len(data) > MAX_ICON_BYTES:
+    if not data:
         return None, None
-    ext = _ext_for(resp.headers.get("content-type", ""))
+    ctype = resp.headers.get("content-type", "")
+    ext = _ext_for(ctype)
+    sniffed = _sniff_ext(data)
+    if sniffed is not None:
+        # 魔数为准：修复 octet-stream（Docker Hub）与「声明 ico 实为 PNG」（Cloudflare）等类型错乱
+        if len(data) <= MAX_ICON_BYTES:
+            return data, sniffed
+        return None, None
+    if ext == "svg":
+        # 文本 SVG 无魔数，按 Content-Type 接受
+        if len(data) <= MAX_ICON_BYTES:
+            return data, "svg"
+        return None, None
     if ext is not None:
-        return data, ext
-    if depth >= MAX_DEPTH:
+        # 声明为图片但魔数未知：若实际是 HTML 错误页则走候选，否则按声明类型接受
+        head = data[:512].lstrip().lower()
+        if not head.startswith((b"<html", b"<!doctype")):
+            if len(data) <= MAX_ICON_BYTES:
+                return data, ext
+            return None, None
+    # 非图片响应（HTML/壳页）：解析候选；页面大小上限独立于图标本体（Cloudflare 首页约 1.3MB）
+    if len(data) > MAX_PAGE_BYTES or depth >= MAX_DEPTH:
         return None, None
-    # 非图片响应（通常是 HTML）：按优先级尝试候选
     html = data.decode("utf-8", errors="ignore")
+    seen: set[str] = set()
     for candidate in _candidate_urls(html, url):
-        if candidate == url:
+        if candidate == url or candidate in seen:
             continue
+        seen.add(candidate)
         if candidate.startswith("manifest:"):
             icon_url = _best_manifest_icon(candidate[9:], timeout)
             if icon_url is None or icon_url == url:
@@ -273,16 +318,42 @@ def _download(
     return None, None
 
 
+def _parent_domain_favicon(url: str) -> str | None:
+    """子域名失败兜底：尝试父域名的根 favicon（如 dash.cloudflare.com → cloudflare.com/favicon.ico）。
+
+    仅用于「自身域名完全抓不到」时的最后手段；www. 与根域等价，不改变结果。
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return None
+    labels = parsed.hostname.lower().split(".")
+    if len(labels) <= 2:
+        return None  # 本身已是注册域（含 www. 二级结构由后续 join 处理）
+    candidate = ".".join(labels[1:])
+    if not candidate:
+        return None
+    return f"{parsed.scheme}://{candidate}/favicon.ico"
+
+
 def fetch_favicon(
     url: str,
     timeout: float = FETCH_TIMEOUT,
 ) -> tuple[bytes, str] | None:
-    """抓取 favicon，返回 (bytes, ext)；失败返回 None。并发受限。"""
+    """抓取 favicon，返回 (bytes, ext)；失败返回 None。并发受限。
+
+    自身域名全部候选失败后，兜底尝试父域名根 /favicon.ico（dash.cloudflare.com 等
+    受 JS 挑战保护的子站可借此拿到同品牌图标）。
+    """
     with _semaphore:
         result = _download(url, timeout)
-        if result is None or result[0] is None:
-            return None
-        return result
+        if result is not None and result[0] is not None:
+            return result
+        parent = _parent_domain_favicon(url)
+        if parent is not None:
+            result = _download(parent, timeout)
+            if result is not None and result[0] is not None:
+                return result
+        return None
 
 
 def get_cached(link_id: int) -> str | None:

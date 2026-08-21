@@ -2,6 +2,18 @@
 
 ## 0.1.0（2026-08-21）
 
+### 图标抓取逻辑加强（2026-08-22）
+
+- **魔数识别（`_sniff_ext`）**：不依赖 Content-Type，按文件头识别 PNG/JPEG/GIF/WEBP/ICO/文本 SVG。修复两类真实失败：
+  - Docker Hub：`favicon.ico` 以 `application/octet-stream` 返回（实际为 PNG），此前被拒；
+  - Cloudflare：`favicon.ico` 声明 `image/x-icon` 但内容实为 PNG，此前会存错扩展名。
+- **页面大小上限独立**：首页 HTML 解析候选上限放宽到 5MB（`MAX_PAGE_BYTES`，图标本体仍限 1MB）。修复 Cloudflare 首页 1.3MB 超限导致候选从未解析的问题。
+- **父域兜底**：自身域名全部候选失败（如 dash.cloudflare.com 的 403 JS 挑战）时，尝试父域名根 `/favicon.ico`（dash.cloudflare.com → cloudflare.com/favicon.ico）。
+- **候选去重**：同一候选 URL 只请求一次（link 候选与根回退重复场景）。
+- 支持 GIF favicon（Content-Type 白名单补充 `image/gif`）。
+- 验证：pytest 202 passed（+8）；真实站点实测 6/6 成功（hub.docker.com / www.docker.com / cloudflare.com / www.cloudflare.com / dash.cloudflare.com / developers.cloudflare.com，修复前仅 1/6）。
+
+
 ### 超长 URL 显示修复（2026-08-22）
 
 - **后台快捷方式表格**：URL 列在所有断点统一单行截断 + 省略号（原桌面端恢复自然换行，298 字符 URL 会把行撑高至 164px 且无省略号）；单元格增加 `title` 悬停查看全文；列宽统一由 `.table-cell-clip`（11rem）控制。
