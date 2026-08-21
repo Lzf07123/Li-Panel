@@ -9,3 +9,10 @@ def test_api_no_store(client):
     assert r.headers["cache-control"] == "no-store"
     assert r.headers["x-panel-version"] == "0.1.0"
     assert r.json()["version"] == "0.1.0"
+
+
+def test_index_html_no_cache(client):
+    """上线前修复：SPA 入口 index.html 不缓存，发版后立即生效。"""
+    r = client.get("/")
+    assert "text/html" in r.headers["content-type"]
+    assert r.headers["cache-control"] == "no-cache"
