@@ -281,3 +281,58 @@ def test_logout_uri_rejects_backslash(client):
     assert r.headers["location"] == "/"
     r = client.get("/auth/logout?next=//evil.example.com", follow_redirects=False)
     assert r.headers["location"] == "/"
+
+
+def test_sso_login_rate_limited(sso_client):
+    """上线前修复：SSO 发起入口与回调一致，按 IP 限流。"""
+    locations = []
+    for _ in range(11):
+        r = sso_client.get("/auth/sso/login", follow_redirects=False)
+        locations.append(r.headers.get("location", ""))
+    assert locations[-1].startswith("/login?error="), locations[-1]
+    assert "请求过于频繁" in unquote(locations[-1])
+
+
+def test_sso_flow_cleanup(sso_client):
+    """上线前修复：sso_flows 滚动清理过期与已消费（>1 天）流程。"""
+    from datetime import datetime, timedelta, timezone
+
+    from app.db import connect
+
+    db_path = sso_client.app.state.db_path
+    conn = connect(db_path)
+    now = datetime.now(timezone.utc)
+    fmt = lambda dt: dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    # 过期未消费 → 应删
+    conn.execute(
+        "INSERT INTO sso_flows (token, state, nonce, code_verifier, expires_at, consumed, created_at) "
+        "VALUES ('expired-flow', 's', 'n', 'v', ?, 0, ?)",
+        (fmt(now - timedelta(minutes=1)), fmt(now - timedelta(hours=2))),
+    )
+    # 已消费且超过 1 天 → 应删
+    conn.execute(
+        "INSERT INTO sso_flows (token, state, nonce, code_verifier, expires_at, consumed, created_at) "
+        "VALUES ('old-consumed', 's', 'n', 'v', ?, 1, ?)",
+        (fmt(now + timedelta(minutes=5)), fmt(now - timedelta(days=2))),
+    )
+    # 已消费但未超 1 天 → 保留
+    conn.execute(
+        "INSERT INTO sso_flows (token, state, nonce, code_verifier, expires_at, consumed, created_at) "
+        "VALUES ('fresh-consumed', 's', 'n', 'v', ?, 1, ?)",
+        (fmt(now + timedelta(minutes=5)), fmt(now - timedelta(minutes=30))),
+    )
+    conn.commit()
+    conn.close()
+
+    r = sso_client.get("/auth/sso/login", follow_redirects=False)
+    assert r.status_code == 302
+
+    conn = connect(db_path)
+    tokens = [
+        row["token"]
+        for row in conn.execute("SELECT token FROM sso_flows").fetchall()
+    ]
+    conn.close()
+    assert "expired-flow" not in tokens
+    assert "old-consumed" not in tokens
+    assert "fresh-consumed" in tokens
