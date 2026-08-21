@@ -6,6 +6,7 @@ import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
 import { AppHeader } from "../components/AppHeader";
+import { probeFromClient, type ProbeResult } from "../lib/probe";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
 import { DateTimeWidget } from "../components/DateTimeWidget";
@@ -68,9 +69,45 @@ export function PanelPage() {
   const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
   const meRef = useRef<MeOut | null>(null);
+  const panelRef = useRef<PanelOut | null>(null);
   useEffect(() => {
     meRef.current = me;
   }, [me]);
+  useEffect(() => {
+    panelRef.current = panel;
+  }, [panel]);
+
+  /**
+   * 客户端存活探测（2026-08-22）：刷新页面/回到面板时由浏览器直连目标 URL
+   * （HEAD no-cors），自动使用系统/浏览器代理；结果优先于服务端探测展示。
+   * 仅登录用户执行（访客视图不暴露私密 URL）；30s 节流避免频繁切窗口打爆目标。
+   */
+  const lastClientProbe = useRef(0);
+  const runClientProbe = useCallback(() => {
+    if (!meRef.current) return;
+    const now = Date.now();
+    if (now - lastClientProbe.current < 30_000) return;
+    lastClientProbe.current = now;
+    const panelData = panelRef.current;
+    if (!panelData) return;
+    const targets: { id: number; url: string }[] = [];
+    const collect = (link: LinkOut) => {
+      const url = link.url || link.url_lan || link.url_wan;
+      if (url && /^https?:\/\//.test(url)) targets.push({ id: link.id, url });
+    };
+    for (const group of panelData.groups) group.links.forEach(collect);
+    panelData.ungrouped.forEach(collect);
+    if (targets.length === 0) return;
+    void probeFromClient(targets)
+      .then((map) => {
+        const next: Record<number, ProbeResult> = {};
+        for (const [id, value] of Object.entries(map)) {
+          next[Number(id)] = value;
+        }
+        setLinkHealth((prev) => ({ ...prev, ...next }));
+      })
+      .catch(() => undefined);
+  }, []);
 
   /** 站点连接检测由用户侧发起：refresh=true 强制重新检测（忽略服务端缓存）。
 
@@ -92,14 +129,16 @@ export function PanelPage() {
       : healthApi.status(refresh);
     void target
       .then((data) => {
-        const map: Record<
-          number,
-          { status: "up" | "down" | "unknown"; ms: number | null }
-        > = {};
-        for (const item of data.results) {
-          map[item.link_id] = { status: item.status, ms: item.ms };
-        }
-        setLinkHealth(map);
+        setLinkHealth((prev) => {
+          const next = { ...prev };
+          for (const item of data.results) {
+            // 客户端探测结果优先；服务端仅补齐未探测的链接（访客/无 URL 链接）
+            if (!(item.link_id in next)) {
+              next[item.link_id] = { status: item.status, ms: item.ms };
+            }
+          }
+          return next;
+        });
       })
       .catch(() => undefined);
   }, []);
@@ -126,19 +165,31 @@ export function PanelPage() {
     panelApi.get().then(setPanel).catch(() => setPanel(null));
   }, [loadHealth]);
 
+  // 刷新/首次进入：panel 与登录态均就绪后立即客户端探测存活率
+  // （panel 与 me 异步加载，刷新时可能 panel 先到；两者齐备才探测）
+  useEffect(() => {
+    if (panel && me) runClientProbe();
+  }, [panel, me, runClientProbe]);
+
   // 回到面板（标签页恢复可见 / 窗口重新聚焦）：重新检测
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") loadHealth(true);
+      if (document.visibilityState === "visible") {
+        loadHealth(true);
+        runClientProbe();
+      }
     };
-    const onFocus = () => loadHealth(true);
+    const onFocus = () => {
+      loadHealth(true);
+      runClientProbe();
+    };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onFocus);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onFocus);
     };
-  }, [loadHealth]);
+  }, [loadHealth, runClientProbe]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

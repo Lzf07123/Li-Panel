@@ -46,7 +46,7 @@ def _build_csp(settings: Settings) -> str:
         "'self'" if settings.environment == "production" else "'self' 'unsafe-inline'"
     )
     return (
-        f"default-src 'self'; connect-src 'self'; "
+        f"default-src 'self'; connect-src 'self' https: http:; "
         f"img-src 'self' data:; style-src {style_src}; font-src 'self' data:; "
         f"object-src 'none'; base-uri 'self'; form-action 'self'; "
         f"frame-src 'self' https: http:; frame-ancestors 'none'"

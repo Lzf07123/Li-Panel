@@ -7,6 +7,8 @@ def test_security_headers(client):
     assert "camera=()" in r.headers["permissions-policy"]
     csp = r.headers["content-security-policy"]
     assert "font-src 'self' data:" in csp
+    # 客户端存活探测：浏览器直连目标 URL（自动走系统/浏览器代理）
+    assert "connect-src 'self' https: http:" in csp
     assert "strict-transport-security" not in r.headers
 
 
