@@ -45,22 +45,55 @@ def _post(client, origin):
     )
 
 
-def test_csrf_origin_same_host_different_port_blocked(tmp_path):
-    """上线前修复：CSRF Origin 校验比较完整 host+port，同 host 不同端口必须拒绝。"""
+def _post_headers(c, origin, extra=None):
+    return c.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "secret123"},
+        headers={"Origin": origin, **(extra or {})},
+    )
+
+
+def test_csrf_origin_nginx_no_forwarded_host_allows(tmp_path):
+    """回归修复：nginx 默认 $host 剥离端口时，Host 无端口 + Origin 带端口必须放行。"""
+    c = _csrf_client(tmp_path, host="119.130.239.18")
+    assert _post_headers(c, "http://119.130.239.18:8000").status_code != 403
+
+
+def test_csrf_origin_same_host_different_port_without_proxy_allows(tmp_path):
+    """无 X-Forwarded-Host 时回退 hostname 比较（SameSite=Lax 兜底），不误伤反代部署。"""
     c = _csrf_client(tmp_path, host="localhost:8000")
-    assert _post(c, "http://localhost:8080").status_code == 403
-    # 同 host 同端口放行（继续走认证逻辑，不应是 403）
-    assert _post(c, "http://localhost:8000").status_code != 403
+    assert _post_headers(c, "http://localhost:8080").status_code != 403
+    assert _post_headers(c, "http://localhost:8000").status_code != 403
+
+
+def test_csrf_origin_x_forwarded_host_strict(tmp_path):
+    """代理透传原始 Host（含端口）时，完整 netloc 严格校验：不同端口拒绝。"""
+    c = _csrf_client(tmp_path, host="119.130.239.18")
+    # 同 netloc → 放行
+    r = _post_headers(
+        c, "http://119.130.239.18:8000", {"X-Forwarded-Host": "119.130.239.18:8000"}
+    )
+    assert r.status_code != 403
+    # 不同端口 → 拒绝
+    r = _post_headers(
+        c, "http://119.130.239.18:8080", {"X-Forwarded-Host": "119.130.239.18:8000"}
+    )
+    assert r.status_code == 403
+    # 伪造 host → 拒绝
+    r = _post_headers(
+        c, "http://evil.example", {"X-Forwarded-Host": "119.130.239.18:8000"}
+    )
+    assert r.status_code == 403
 
 
 def test_csrf_origin_default_port_normalized(tmp_path):
     """HTTPS 部署下 Host 带 :443、Origin 不带端口，仍应放行。"""
     c = _csrf_client(tmp_path, host="panel.example:443")
-    assert _post(c, "https://panel.example").status_code != 403
-    assert _post(c, "https://panel.example:443").status_code != 403
+    assert _post_headers(c, "https://panel.example").status_code != 403
+    assert _post_headers(c, "https://panel.example:443").status_code != 403
 
 
 def test_csrf_origin_cross_host_blocked(tmp_path):
     c = _csrf_client(tmp_path, host="panel.example")
-    assert _post(c, "http://evil.example").status_code == 403
-    assert _post(c, "https://panel.example").status_code != 403
+    assert _post_headers(c, "http://evil.example").status_code == 403
+    assert _post_headers(c, "https://panel.example").status_code != 403

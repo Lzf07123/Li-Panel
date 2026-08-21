@@ -115,16 +115,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             origin = request.headers.get("origin")
             if origin:
                 parsed_origin = urlparse(origin)
-                parsed_host = urlparse("//" + (request.headers.get("host") or ""))
-                if (
-                    parsed_origin.scheme not in {"http", "https"}
-                    or not parsed_origin.hostname
-                    or not parsed_host.hostname
-                    or _netloc_key(parsed_origin) != _netloc_key(parsed_host)
-                ):
+                if parsed_origin.scheme not in {"http", "https"} or not parsed_origin.hostname:
                     return JSONResponse(
                         {"error": "跨域请求被拒绝"}, status_code=403
                     )
+                # 代理（nginx）透传了原始 Host（含端口）时，用完整 netloc 严格校验，
+                # 堵住「同 host 不同端口」缺口。
+                forwarded = request.headers.get("x-forwarded-host")
+                if forwarded:
+                    parsed_host = urlparse("//" + forwarded)
+                    if (
+                        not parsed_host.hostname
+                        or _netloc_key(parsed_origin) != _netloc_key(parsed_host)
+                    ):
+                        return JSONResponse(
+                            {"error": "跨域请求被拒绝"}, status_code=403
+                        )
+                else:
+                    # 未透传端口（nginx 默认 $host 剥离端口）：回退 hostname 比较，
+                    # 避免 IP:端口 + 反代部署下所有写请求被误拒（SameSite=Lax 兜底）。
+                    parsed_host = urlparse("//" + (request.headers.get("host") or ""))
+                    if not parsed_host.hostname or parsed_host.hostname != parsed_origin.hostname:
+                        return JSONResponse(
+                            {"error": "跨域请求被拒绝"}, status_code=403
+                        )
         response = await call_next(request)
         response.headers["content-security-policy"] = csp
         response.headers["x-content-type-options"] = "nosniff"
