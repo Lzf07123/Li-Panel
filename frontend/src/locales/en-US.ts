@@ -122,6 +122,7 @@ export const enUS: Record<string, string> = {
   "重新检测所有快捷方式的存活状态": "Re-check the liveness of all shortcuts",
   "检测中…": "Checking…",
   "存活检测完成": "Liveness check complete",
+  "检测中 {done}/{total} 批": "Checking batch {done}/{total}",
   "没有启用健康检查的快捷方式": "No shortcuts have health check enabled",
   // 设置
   "站点信息": "Site",

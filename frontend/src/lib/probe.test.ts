@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { LinkOut } from "../api/types";
 
 import {
+  CLIENT_PROBE_BATCH_SIZE,
   CLIENT_PROBE_TIMEOUT,
   collectProbeTargets,
   loadProbeCache,
@@ -196,5 +197,73 @@ describe("collectProbeTargets", () => {
       { ...base, id: 3, health_enabled: false, url: "https://x.example" },
     ];
     expect(collectProbeTargets(links)).toEqual([]);
+  });
+});
+
+describe("probeFromClient 分批探测", () => {
+  it("批内并发上限为批大小，批间串行（下一批等上一批全部完成）", async () => {
+    let active = 0;
+    let maxActive = 0;
+    mockFetch(() => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      return new Promise((resolve) =>
+        setTimeout(() => {
+          active -= 1;
+          resolve(new Response(null));
+        }, 20),
+      );
+    });
+    const targets = Array.from({ length: 7 }, (_, i) => ({
+      id: i,
+      url: `https://x${i}.example`,
+    }));
+    const result = await probeFromClient(targets, fetch, 5000);
+    // 7 个目标分 2 批：第 1 批 6 个并发，第 2 批 1 个，活跃数永不越过批大小
+    expect(CLIENT_PROBE_BATCH_SIZE).toBeGreaterThan(0);
+    expect(maxActive).toBeLessThanOrEqual(CLIENT_PROBE_BATCH_SIZE);
+    expect(maxActive).toBe(CLIENT_PROBE_BATCH_SIZE);
+    expect(Object.keys(result)).toHaveLength(7);
+  });
+
+  it("每批完成后按批回调 onBatch 与进度", async () => {
+    mockFetch((_url) => {
+      const id = Number(new URL(_url).hostname.replace("x", ""));
+      return new Promise((resolve) =>
+        setTimeout(() => resolve(new Response(null)), id === 0 ? 20 : 120),
+      );
+    });
+    const targets = Array.from({ length: 7 }, (_, i) => ({
+      id: i,
+      url: `https://x${i}.example`,
+    }));
+    const batches: { done: number; total: number; ids: number[] }[] = [];
+    const result = await probeFromClient(targets, fetch, 5000, undefined, (batch, progress) => {
+      batches.push({ done: progress.done, total: progress.total, ids: Object.keys(batch).map(Number) });
+    });
+    expect(batches).toEqual([
+      { done: 1, total: 2, ids: [0, 1, 2, 3, 4, 5] },
+      { done: 2, total: 2, ids: [6] },
+    ]);
+    expect(result[6]).toEqual({ status: "up", ms: expect.any(Number) });
+    expect(Object.keys(result)).toHaveLength(7);
+  });
+
+  it("批内结果仍逐条流式回调（首个快链接先点亮）", async () => {
+    mockFetch((_url) => {
+      const id = Number(new URL(_url).hostname.replace("x", ""));
+      return new Promise((resolve) =>
+        setTimeout(() => resolve(new Response(null)), id === 0 ? 20 : 120),
+      );
+    });
+    const targets = Array.from({ length: 5 }, (_, i) => ({
+      id: i,
+      url: `https://x${i}.example`,
+    }));
+    const seen: number[] = [];
+    await probeFromClient(targets, fetch, 5000, (id) => {
+      seen.push(id);
+    });
+    expect(seen[0]).toBe(0);
   });
 });

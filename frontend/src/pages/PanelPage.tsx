@@ -76,6 +76,11 @@ export function PanelPage() {
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   /** 手动「重新检测」进行中：按钮禁用并显示进度 */
   const [probing, setProbing] = useState(false);
+  /** 分批探测进度：每批完成后更新，全部完成清空（供「分批显示」进度指示） */
+  const [probeProgress, setProbeProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const toast = useToast();
   const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -110,10 +115,20 @@ export function PanelPage() {
       ...panelData.ungrouped,
     ]);
     if (targets.length === 0) return Promise.resolve(false);
-    return probeFromClient(targets, fetch, 5000, (id, value) => {
-      // 流式更新：每个目标完成立即点亮状态点，首个快链接约 100ms 出现
-      setLinkHealth((prev) => ({ ...prev, [id]: value }));
-    })
+    return probeFromClient(
+      targets,
+      fetch,
+      5000,
+      (id, value) => {
+        // 批内流式点亮：每个目标完成立即更新状态点，首个快链接约 100ms 出现
+        setLinkHealth((prev) => ({ ...prev, [id]: value }));
+      },
+      (batchResults, progress) => {
+        // 分批显示：每批完成后整批刷新一次（与流式结果幂等）并更新进度；全部完成清空
+        setLinkHealth((prev) => ({ ...prev, ...batchResults }));
+        setProbeProgress(progress.done < progress.total ? progress : null);
+      },
+    )
       .then((map) => {
         saveProbeCache(map);
         return true;
@@ -548,6 +563,15 @@ export function PanelPage() {
                   ? t("找到 {n} 个结果", { n: total })
                   : t("共 {n} 个快捷方式", { n: total })}
               </span>
+              {probeProgress ? (
+                <span className="badge badge-muted" aria-live="polite">
+                  <span aria-hidden="true" className="spinner mr-1.5 h-3 w-3" />
+                  {t("检测中 {done}/{total} 批", {
+                    done: probeProgress.done,
+                    total: probeProgress.total,
+                  })}
+                </span>
+              ) : null}
               {me && !query.trim() && todayLinks.length > 0 ? (
                 <div
                   className="mt-2 flex max-w-2xl flex-wrap items-center justify-center gap-2"
