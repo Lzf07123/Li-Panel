@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import secrets
 import sqlite3
+import threading
 from typing import Literal
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from app.db import get_db
@@ -14,6 +15,10 @@ from app.deps import current_user
 from app.favicon import fetch_favicon, get_cached, set_cached
 
 router = APIRouter(prefix="/api/links", tags=["links"])
+
+# 自动 favicon 抓取并发槽：批量添加/导入时限制同时活跃的抓取线程，
+# 其余在轻量 daemon 线程上排队，避免线程与出站请求堆积。
+_AUTO_FETCH_SLOTS = threading.BoundedSemaphore(4)
 
 
 def _validate_http_url(value: str | None) -> str | None:
@@ -223,13 +228,17 @@ def _check_duplicate(
             )
 
 
-def _auto_fetch_icon(request: Request, link_id: int, url: str) -> None:
-    """后台自动获取站点 favicon：失败静默，不影响创建/编辑响应。"""
-    settings = request.app.state.settings
+def _auto_fetch_icon(settings, link_id: int, url: str) -> None:
+    """后台自动获取站点 favicon：失败静默，不影响创建/编辑响应。
+
+    在独立 daemon 线程执行，不占用 FastAPI BackgroundTasks/请求生命周期：
+    favicon 抓取可能耗时数秒（多候选 + 父域兜底），若挂在请求上，批量添加时
+    会把 keep-alive 连接与线程池占满，导致后续登出/添加快捷方式请求排队。
+    """
     try:
         from app.db import connect
 
-        result = fetch_favicon(url)
+        result = fetch_favicon(url, timeout=4.0)
         if result is None:
             set_cached(link_id, None)
             return
@@ -253,7 +262,6 @@ def _auto_fetch_icon(request: Request, link_id: int, url: str) -> None:
 
 def _maybe_schedule_icon_fetch(
     request: Request,
-    background_tasks: BackgroundTasks,
     link_id: int,
     body: LinkIn,
 ) -> None:
@@ -262,14 +270,21 @@ def _maybe_schedule_icon_fetch(
     if not settings.link_icon_fetch or body.icon_type != "letter":
         return
     url = body.url_wan or body.url_lan
-    background_tasks.add_task(_auto_fetch_icon, request, link_id, url)
+    def run() -> None:
+        with _AUTO_FETCH_SLOTS:
+            _auto_fetch_icon(settings, link_id, url)
+
+    threading.Thread(
+        target=run,
+        daemon=True,
+        name=f"favicon-{link_id}",
+    ).start()
 
 
 @router.post("", status_code=201)
 def create_link(
     body: LinkIn,
     request: Request,
-    background_tasks: BackgroundTasks,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
@@ -302,7 +317,7 @@ def create_link(
         ),
     )
     link_id = int(cur.lastrowid)
-    _maybe_schedule_icon_fetch(request, background_tasks, link_id, body)
+    _maybe_schedule_icon_fetch(request, link_id, body)
     return _link_dict(_owned_link(conn, link_id, user["id"]))
 
 
@@ -311,7 +326,6 @@ def update_link(
     lid: int,
     body: LinkIn,
     request: Request,
-    background_tasks: BackgroundTasks,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
@@ -344,7 +358,7 @@ def update_link(
             lid,
         ),
     )
-    _maybe_schedule_icon_fetch(request, background_tasks, lid, body)
+    _maybe_schedule_icon_fetch(request, lid, body)
     return _link_dict(_owned_link(conn, lid, user["id"]))
 
 

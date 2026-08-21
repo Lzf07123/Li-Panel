@@ -258,16 +258,28 @@ def _download(
     url: str,
     timeout: float = FETCH_TIMEOUT,
     depth: int = 0,
+    deadline: float | None = None,
 ) -> tuple[bytes, str | None]:
-    """GET 并返回 (bytes, ext)；失败或类型不合规返回 (None, None)。"""
+    """GET 并返回 (bytes, ext)；失败或类型不合规返回 (None, None)。
+
+    deadline（monotonic 时间戳）为整次抓取总预算：递归候选/父域兜底共享，
+    避免「多候选 × 超时」叠加导致单个链接抓取拖垮后台任务。
+    """
     if url.startswith("data:image/"):
         return _decode_data_uri(url) or (None, None)
     if not _allowed_url(url):
         return None, None
+    if deadline is not None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None, None
+        effective_timeout = min(timeout, remaining)
+    else:
+        effective_timeout = timeout
     try:
         resp = httpx.get(
             url,
-            timeout=timeout,
+            timeout=effective_timeout,
             follow_redirects=True,
             headers={"User-Agent": "LiPanel/1.0"},
         )
@@ -307,12 +319,12 @@ def _download(
             continue
         seen.add(candidate)
         if candidate.startswith("manifest:"):
-            icon_url = _best_manifest_icon(candidate[9:], timeout)
+            icon_url = _best_manifest_icon(candidate[9:], effective_timeout)
             if icon_url is None or icon_url == url:
                 continue
-            result = _download(icon_url, timeout, depth + 1)
+            result = _download(icon_url, effective_timeout, depth + 1, deadline)
         else:
-            result = _download(candidate, timeout, depth + 1)
+            result = _download(candidate, effective_timeout, depth + 1, deadline)
         if result is not None and result[0] is not None:
             return result
     return None, None
@@ -338,19 +350,24 @@ def _parent_domain_favicon(url: str) -> str | None:
 def fetch_favicon(
     url: str,
     timeout: float = FETCH_TIMEOUT,
+    total_budget: float = 25.0,
 ) -> tuple[bytes, str] | None:
     """抓取 favicon，返回 (bytes, ext)；失败返回 None。并发受限。
 
     自身域名全部候选失败后，兜底尝试父域名根 /favicon.ico（dash.cloudflare.com 等
     受 JS 挑战保护的子站可借此拿到同品牌图标）。
+
+    total_budget：整次抓取（含候选递归与父域兜底）的总耗时上限，防止慢站点
+    把后台抓取任务拖得过久。
     """
+    deadline = time.monotonic() + total_budget
     with _semaphore:
-        result = _download(url, timeout)
+        result = _download(url, timeout, 0, deadline)
         if result is not None and result[0] is not None:
             return result
         parent = _parent_domain_favicon(url)
         if parent is not None:
-            result = _download(parent, timeout)
+            result = _download(parent, timeout, 0, deadline)
             if result is not None and result[0] is not None:
                 return result
         return None

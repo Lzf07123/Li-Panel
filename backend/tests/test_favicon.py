@@ -500,10 +500,24 @@ def test_large_html_page_fallback(client, auth_headers, smart_server):
 
 
 def test_candidate_dedup(client, auth_headers, smart_server):
-    """link 候选与根回退同 URL 时只请求一次（候选去重）。"""
+    """link 候选与根回退同 URL 时只请求一次（候选去重）。
+
+    用自定义图标创建链接以禁用自动抓取，手动抓取路径独占请求计数。
+    """
     _SmartHandler.mode = "octet"
     _SmartHandler.favicon_hits = 0
-    _fetch_and_get_icon(client, auth_headers, smart_server)
+    lid = client.post(
+        "/api/links",
+        json={
+            "name": "站点",
+            "url_lan": smart_server,
+            "icon_type": "iconify",
+            "icon_value": "mdi:test",
+        },
+        headers=auth_headers,
+    ).json()["id"]
+    r = client.post(f"/api/links/{lid}/fetch-icon", headers=auth_headers)
+    assert r.status_code == 200
     assert _SmartHandler.favicon_hits == 1
 
 
@@ -532,7 +546,7 @@ def test_fetch_favicon_parent_domain_fallback(monkeypatch):
 
     calls: list[str] = []
 
-    def fake_download(url, timeout=favicon_module.FETCH_TIMEOUT):
+    def fake_download(url, timeout=favicon_module.FETCH_TIMEOUT, depth=0, deadline=None):
         calls.append(url)
         if url.startswith("https://cloudflare.com/"):
             return (PNG_BYTES, "png")
@@ -553,7 +567,7 @@ def test_fetch_favicon_no_parent_when_self_ok(monkeypatch):
 
     calls: list[str] = []
 
-    def fake_download(url, timeout=favicon_module.FETCH_TIMEOUT):
+    def fake_download(url, timeout=favicon_module.FETCH_TIMEOUT, depth=0, deadline=None):
         calls.append(url)
         return (PNG_BYTES, "png")
 
@@ -561,3 +575,76 @@ def test_fetch_favicon_no_parent_when_self_ok(monkeypatch):
     result = favicon_module.fetch_favicon("https://hub.docker.com", timeout=5)
     assert result is not None
     assert calls == ["https://hub.docker.com"]
+
+
+def test_auto_fetch_runs_in_background(client, auth_headers, monkeypatch):
+    """创建链接响应不被后台 favicon 抓取阻塞（独立 daemon 线程）。"""
+    import time
+
+    from app.routers import links as links_module
+
+    calls: list[str] = []
+
+    def slow_fetch(url, timeout=5.0, total_budget=25.0):
+        calls.append(url)
+        time.sleep(0.6)
+        return None
+
+    monkeypatch.setattr(links_module, "fetch_favicon", slow_fetch)
+
+    t0 = time.monotonic()
+    r = client.post(
+        "/api/links",
+        json={"name": "后台抓取", "url_lan": "https://203.0.113.1/x"},
+        headers=auth_headers,
+    )
+    elapsed = time.monotonic() - t0
+    assert r.status_code == 201
+    assert elapsed < 0.4, f"创建链接响应被后台抓取阻塞：{elapsed:.2f}s"
+    # 后台线程稍后执行抓取
+    for _ in range(20):
+        if calls:
+            break
+        time.sleep(0.05)
+    assert calls, "后台 favicon 抓取未执行"
+
+
+def test_download_respects_deadline(monkeypatch):
+    """_download 在 deadline 过期后立即放弃，不再发起请求。"""
+    import time
+
+    from app import favicon as favicon_module
+
+    def fail_get(*args, **kwargs):
+        raise AssertionError("deadline 过期后不应再发起 HTTP 请求")
+
+    monkeypatch.setattr(favicon_module.httpx, "get", fail_get)
+    result = favicon_module._download(
+        "https://example.com/favicon.ico",
+        timeout=5,
+        deadline=time.monotonic() - 1,
+    )
+    assert result == (None, None)
+
+
+def test_fetch_favicon_passes_budget_deadline(monkeypatch):
+    """fetch_favicon 把总预算 deadline 传给自身与父域兜底两次下载。"""
+    import time
+
+    from app import favicon as favicon_module
+
+    deadlines: list[float | None] = []
+
+    def fake_download(url, timeout=5.0, depth=0, deadline=None):
+        deadlines.append(deadline)
+        return (None, None)
+
+    monkeypatch.setattr(favicon_module, "_download", fake_download)
+    result = favicon_module.fetch_favicon(
+        "https://dash.cloudflare.com", timeout=5, total_budget=10
+    )
+    assert result is None
+    assert len(deadlines) == 2  # 自身域名 + 父域兜底
+    for deadline in deadlines:
+        assert deadline is not None
+        assert 0 < deadline - time.monotonic() <= 10

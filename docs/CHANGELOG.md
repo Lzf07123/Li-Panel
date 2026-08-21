@@ -13,6 +13,13 @@
 - 支持 GIF favicon（Content-Type 白名单补充 `image/gif`）。
 - 验证：pytest 202 passed（+8）；真实站点实测 6/6 成功（hub.docker.com / www.docker.com / cloudflare.com / www.cloudflare.com / dash.cloudflare.com / developers.cloudflare.com，修复前仅 1/6）。
 
+### 图标抓取后台化与超时预算（2026-08-22，修复登出/添加快捷方式卡顿）
+
+- **自动抓取改独立 daemon 线程**：创建/编辑链接后的 favicon 抓取不再挂在 FastAPI `BackgroundTasks`/请求生命周期上（此前会占用 keep-alive 连接，批量添加时后续登出、继续添加请求可能排队卡顿）。
+- **并发槽**：自动抓取线程全局限 4 个同时活跃，其余排队，防止批量导入时线程与出站请求堆积。
+- **总超时预算**：`fetch_favicon` 支持 `total_budget`（默认 25s），候选递归与父域兜底共享 deadline，慢站点不再无限叠加超时。
+- 验证：pytest 205 passed（+3：响应不阻塞/过期 deadline 不再发请求/预算传递）；端到端实测连续创建 8 个慢抓取链接 0.04s、登出 0.00s、再添加 0.00s。
+
 
 ### 超长 URL 显示修复（2026-08-22）
 
