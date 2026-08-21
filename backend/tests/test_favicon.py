@@ -212,8 +212,11 @@ def test_auto_fetch_disabled(client, auth_headers, icon_server, tmp_path):
 class _SmartHandler(BaseHTTPRequestHandler):
     """可配置 HTML：mode=fallback 无 link 但有 /favicon.ico；mode=size 两个图标；mode=data 内联；mode=apple 仅 apple-touch。"""
     mode = "fallback"
+    favicon_hits = 0
 
     def do_GET(self):  # noqa: N802
+        if self.path == "/favicon.ico":
+            type(self).favicon_hits += 1
         if self.path == "/favicon.ico" and self.mode == "fallback":
             body, ctype = PNG_BYTES, "image/png"
         elif self.mode == "size":
@@ -288,6 +291,31 @@ class _SmartHandler(BaseHTTPRequestHandler):
                 b"<html><head><link rel='icon' href='data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3C/svg%3E'></head></html>"
             )
             ctype = "text/html"
+        elif self.mode == "octet":
+            # Docker Hub 场景：favicon.ico 以 application/octet-stream 返回，内容实为 PNG
+            if self.path == "/favicon.ico":
+                body, ctype = PNG_BYTES, "application/octet-stream"
+            else:
+                body = b'<html><head><link rel="icon" href="/favicon.ico"></head></html>'
+                ctype = "text/html"
+        elif self.mode == "ico-declared-png":
+            # Cloudflare 场景：声明 image/x-icon 但内容实为 PNG
+            if self.path == "/favicon.ico":
+                body, ctype = PNG_BYTES, "image/vnd.microsoft.icon"
+            else:
+                body = b'<html><head><link rel="icon" href="/favicon.ico"></head></html>'
+                ctype = "text/html"
+        elif self.mode == "bigpage":
+            # Cloudflare 首页场景：HTML >1MB（超过图标本体 1MB 上限）仍应解析候选
+            if self.path == "/favicon.ico":
+                body, ctype = PNG_BYTES, "image/png"
+            else:
+                padding = b"<!-- " + b"x" * 1_200_000 + b" -->"
+                body = (
+                    b'<html><head><link rel="icon" href="/favicon.ico"></head></html>'
+                    + padding
+                )
+                ctype = "text/html"
         else:
             body, ctype = PNG_BYTES, "image/png"
         self.send_response(200)
@@ -303,6 +331,7 @@ class _SmartHandler(BaseHTTPRequestHandler):
 @pytest.fixture
 def smart_server():
     _SmartHandler.mode = "fallback"
+    _SmartHandler.favicon_hits = 0
     server = ThreadingHTTPServer(("127.0.0.1", 0), _SmartHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -431,3 +460,104 @@ def test_twitter_image_fallback(client, auth_headers, smart_server):
     html = '<html><head><meta name="twitter:image:src" content="/tw.png"></head></html>'
     candidates = _candidate_urls(html, "http://x.example/")
     assert any("tw.png" in c for c in candidates)
+
+
+def test_sniff_ext_unit():
+    from app.favicon import _sniff_ext
+
+    assert _sniff_ext(b"\x89PNG\r\n\x1a\n" + b"0" * 8) == "png"
+    assert _sniff_ext(b"\xff\xd8\xff\xe0") == "jpg"
+    assert _sniff_ext(b"GIF89a") == "gif"
+    assert _sniff_ext(b"RIFF\x00\x00\x00\x00WEBP") == "webp"
+    assert _sniff_ext(b"\x00\x00\x01\x00\x00\x00") == "ico"
+    assert _sniff_ext(b'<svg xmlns="http://www.w3.org/2000/svg"></svg>') == "svg"
+    assert _sniff_ext(b"<?xml version='1.0'?><svg></svg>") == "svg"
+    assert _sniff_ext(b"plain text") is None
+
+
+def test_octet_stream_png(client, auth_headers, smart_server):
+    """Docker Hub：favicon.ico 返回 application/octet-stream 但内容为 PNG，按魔数识别。"""
+    _SmartHandler.mode = "octet"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert icon.endswith(".png")
+
+
+def test_ico_declared_png_content(client, auth_headers, smart_server):
+    """Cloudflare：favicon.ico 声明 image/x-icon 但内容实为 PNG，按魔数纠正扩展名。"""
+    _SmartHandler.mode = "ico-declared-png"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert icon.endswith(".png")
+    resp = client.get(icon)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/png")
+
+
+def test_large_html_page_fallback(client, auth_headers, smart_server):
+    """首页 HTML 超过 1MB（Cloudflare 约 1.3MB）仍应解析候选图标。"""
+    _SmartHandler.mode = "bigpage"
+    icon = _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert client.get(icon).status_code == 200
+
+
+def test_candidate_dedup(client, auth_headers, smart_server):
+    """link 候选与根回退同 URL 时只请求一次（候选去重）。"""
+    _SmartHandler.mode = "octet"
+    _SmartHandler.favicon_hits = 0
+    _fetch_and_get_icon(client, auth_headers, smart_server)
+    assert _SmartHandler.favicon_hits == 1
+
+
+def test_parent_domain_favicon_unit():
+    from app.favicon import _parent_domain_favicon
+
+    assert (
+        _parent_domain_favicon("https://dash.cloudflare.com/some/path")
+        == "https://cloudflare.com/favicon.ico"
+    )
+    assert (
+        _parent_domain_favicon("https://www.cloudflare.com")
+        == "https://cloudflare.com/favicon.ico"
+    )
+    assert _parent_domain_favicon("https://cloudflare.com") is None
+    assert _parent_domain_favicon("https://example.com") is None
+    assert _parent_domain_favicon("http://a.b.example.com:8080/x") == (
+        "http://b.example.com/favicon.ico"
+    )
+    assert _parent_domain_favicon("ftp://x.example.com") is None
+
+
+def test_fetch_favicon_parent_domain_fallback(monkeypatch):
+    """自身域名失败时兜底父域根 favicon（dash.cloudflare.com 403 场景）。"""
+    from app import favicon as favicon_module
+
+    calls: list[str] = []
+
+    def fake_download(url, timeout=favicon_module.FETCH_TIMEOUT):
+        calls.append(url)
+        if url.startswith("https://cloudflare.com/"):
+            return (PNG_BYTES, "png")
+        return (None, None)
+
+    monkeypatch.setattr(favicon_module, "_download", fake_download)
+    result = favicon_module.fetch_favicon("https://dash.cloudflare.com", timeout=5)
+    assert result == (PNG_BYTES, "png")
+    assert calls == [
+        "https://dash.cloudflare.com",
+        "https://cloudflare.com/favicon.ico",
+    ]
+
+
+def test_fetch_favicon_no_parent_when_self_ok(monkeypatch):
+    """自身域名成功时不做父域兜底。"""
+    from app import favicon as favicon_module
+
+    calls: list[str] = []
+
+    def fake_download(url, timeout=favicon_module.FETCH_TIMEOUT):
+        calls.append(url)
+        return (PNG_BYTES, "png")
+
+    monkeypatch.setattr(favicon_module, "_download", fake_download)
+    result = favicon_module.fetch_favicon("https://hub.docker.com", timeout=5)
+    assert result is not None
+    assert calls == ["https://hub.docker.com"]
