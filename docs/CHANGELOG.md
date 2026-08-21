@@ -2,6 +2,20 @@
 
 ## 0.1.0（2026-08-21）
 
+### 上线前全面审查修复（第二轮，2026-08-21）
+
+- **安全（P1）**：`PANEL_HOST_COOKIE=true` 时会话管理接口（列表/吊销单个/全量吊销）改从 `settings.session_cookie` 读取 Cookie，修复 `__Host-` 模式下 current 标记恒为 false、可误吊销当前会话的问题；新增 3 条回归测试。
+- **安全（P2）**：启动校验 `PANEL_HOST_COOKIE=true` 必须同时 `PANEL_COOKIE_SECURE=true`（`__Host-` 前缀要求 Secure）；新增测试。
+- **安全（P2）**：`GET /uploads/{name}` 文件名增加单段安全字符白名单（与 `/favicons` 一致），纵深防御编码斜杠路径穿越；新增 2 条测试。
+- **安全（P3）**：CSRF Origin 校验改为比较完整 host+port（默认端口 80/443 归一化），堵住同 host 不同端口缺口；新增 3 条测试。
+- **安全（P3）**：SSO 发起入口（`/auth/sso/login`）与回调一致按 IP 限流；`sso_flows` 增加滚动清理（过期立删、已消费超 1 天删除）；新增 2 条测试。
+- **缓存（P3）**：SPA 入口 index.html 增加 `Cache-Control: no-cache`，发版后即时生效；新增测试。
+- **Host 白名单（P3）**：改用 `urlparse` 解析 Host 头，兼容 IPv6 字面量 `[::1]:port`；新增 2 条测试。
+- **i18n（P3）**：设置页 slogan 字段中文界面显示「标语」（原为英文 `slogan`），en-US 映射 "Slogan"。
+- **前端（P3）**：ToastProvider 标题随语言切换即时更新（补 `DEFAULT_TITLES` 依赖）；PanelPage/SettingsPage 消除 exhaustive-deps 警告。
+- 验证：pytest 194 passed（+14）、tsc/vite build/vitest 17 passed、oxlint 仅剩 3 条 fast-refresh 风格警告。
+
+
 ### 上线前审查修复（2026-08-21）
 
 - **安全**：修复 SPA 回退路径穿越（编码 `..` 可下载 `data/panel.db` 等任意文件）；通知 webhook（`notify_url`/`notify_enabled`）仅管理员可见；登录锁定到期后自动解除；SSO 回调/RP 登出全链路使用配置的会话 Cookie 名（`PANEL_HOST_COOKIE` 生效）；登出回跳拒绝反斜杠防开放跳转。
