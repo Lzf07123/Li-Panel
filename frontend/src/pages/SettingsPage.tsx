@@ -1286,7 +1286,10 @@ export function SettingsPage() {
                               />
                             </td>
                             <td className="min-w-44 font-medium">{link.name}</td>
-                            <td className="table-cell-clip max-w-56 font-mono text-xs text-muted">
+                            <td
+                              className="table-cell-clip font-mono text-xs text-muted"
+                              title={link.url_lan}
+                            >
                               {link.url_lan}
                             </td>
                             <td>

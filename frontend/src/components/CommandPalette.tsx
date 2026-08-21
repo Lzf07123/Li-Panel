@@ -183,9 +183,16 @@ export function CommandPalette({
                 onMouseEnter={() => setActive(index)}
                 onClick={() => item.run()}
               >
-                <span className="truncate">{item.label}</span>
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {item.label}
+                </span>
                 {item.hint ? (
-                  <span className="truncate text-xs text-muted">{item.hint}</span>
+                  <span
+                    title={item.hint}
+                    className="min-w-0 max-w-[45%] shrink truncate text-xs text-muted"
+                  >
+                    {item.hint}
+                  </span>
                 ) : null}
               </button>
             </li>

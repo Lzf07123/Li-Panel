@@ -14,7 +14,7 @@ export function LinkPreviewModal({
   return (
     <Modal open={true} onClose={onClose} title={link.name} maxWidth="max-w-4xl">
       <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-xs text-muted">{href}</p>
+        <p className="min-w-0 truncate text-xs text-muted" title={href}>{href}</p>
         <a
           className="btn btn-ghost h-8 shrink-0 px-3 text-xs"
           href={href}

@@ -760,20 +760,13 @@
     @apply transition-colors duration-150 hover:bg-surface-2/60;
   }
 
-  /* 表格长文本列：窄屏单行截断，桌面恢复自然换行 */
+  /* 表格长文本列：所有断点统一单行截断 + 省略号（超长 URL 不再撑高/破版），
+     全文通过单元格 title 悬停查看 */
   .table-cell-clip {
     max-width: 11rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  @media (min-width: 1024px) {
-    .table-cell-clip {
-      max-width: none;
-      overflow: visible;
-      text-overflow: clip;
-      white-space: normal;
-    }
   }
 
   /* 横向滑动标签栏：单行、隐藏滚动条、snap 吸附 */
