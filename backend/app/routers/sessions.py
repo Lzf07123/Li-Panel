@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.db import get_db
 from app.deps import current_user
@@ -22,11 +21,12 @@ def _current_session_id(conn, token: str | None, user_id: int) -> int | None:
 
 @router.get("")
 def list_sessions(
-    lipanel_session: Annotated[str | None, Cookie()] = None,
+    request: Request,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> list[dict]:
-    current_id = _current_session_id(conn, lipanel_session, user["id"])
+    token = request.cookies.get(request.app.state.settings.session_cookie)
+    current_id = _current_session_id(conn, token, user["id"])
     rows = conn.execute(
         "SELECT id, created_at, last_used_at, expires_at FROM sessions "
         "WHERE user_id = ? ORDER BY last_used_at DESC",
@@ -56,12 +56,13 @@ def _owned_session(conn, sid: int, user_id: int) -> sqlite3.Row:
 @router.delete("/{sid}", status_code=200)
 def revoke_session(
     sid: int,
-    lipanel_session: Annotated[str | None, Cookie()] = None,
+    request: Request,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
     row = _owned_session(conn, sid, user["id"])
-    if lipanel_session and row["token"] == lipanel_session:
+    token = request.cookies.get(request.app.state.settings.session_cookie)
+    if token and row["token"] == token:
         raise HTTPException(status_code=400, detail="不能吊销当前会话")
     conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
     return {"revoked": 1}
@@ -69,18 +70,19 @@ def revoke_session(
 
 @router.delete("", status_code=200)
 def revoke_all_sessions(
-    lipanel_session: Annotated[str | None, Cookie()] = None,
+    request: Request,
     user: sqlite3.Row = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
-    if lipanel_session:
+    token = request.cookies.get(request.app.state.settings.session_cookie)
+    if token:
         before = conn.execute(
             "SELECT COUNT(*) AS n FROM sessions WHERE user_id = ? AND token != ?",
-            (user["id"], lipanel_session),
+            (user["id"], token),
         ).fetchone()["n"]
         conn.execute(
             "DELETE FROM sessions WHERE user_id = ? AND token != ?",
-            (user["id"], lipanel_session),
+            (user["id"], token),
         )
         return {"revoked": before}
     before = conn.execute(

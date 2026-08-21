@@ -62,3 +62,50 @@ def test_revoke_foreign_session_404(client, auth_headers):
         client.delete(f"/api/sessions/{sessions[0]['id']}", headers=auth_headers).status_code
         == 404
     )
+
+
+def _host_cookie_client(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    app = create_app(
+        load_settings(
+            overrides={
+                "data_dir": str(tmp_path),
+                "secret_key": "x",
+                "host_cookie": True,
+                "cookie_secure": True,
+            }
+        )
+    )
+    c = TestClient(app)
+    c.post("/api/setup", json={"username": "admin", "password": "secret123"})
+    r = c.post("/api/auth/login", json={"username": "admin", "password": "secret123"})
+    return c, {"Cookie": f"__Host-lipanel_session={r.cookies['__Host-lipanel_session']}"}
+
+
+def test_host_cookie_sessions_marks_current(tmp_path):
+    """上线前修复：__Host- 会话模式下会话管理接口必须正确识别当前会话。"""
+    c, headers = _host_cookie_client(tmp_path)
+    sessions = c.get("/api/sessions", headers=headers).json()
+    assert len(sessions) == 1
+    assert sum(1 for s in sessions if s["current"]) == 1
+
+
+def test_host_cookie_revoke_current_rejected(tmp_path):
+    c, headers = _host_cookie_client(tmp_path)
+    sessions = c.get("/api/sessions", headers=headers).json()
+    current = next(s for s in sessions if s["current"])
+    assert (
+        c.delete(f"/api/sessions/{current['id']}", headers=headers).status_code == 400
+    )
+    assert c.get("/api/auth/me", headers=headers).status_code == 200
+
+
+def test_host_cookie_revoke_all_keeps_current(tmp_path):
+    c, headers = _host_cookie_client(tmp_path)
+    r = c.delete("/api/sessions", headers=headers)
+    assert r.status_code == 200 and r.json()["revoked"] == 0
+    assert c.get("/api/auth/me", headers=headers).status_code == 200
