@@ -6,7 +6,14 @@ import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
 import { AppHeader } from "../components/AppHeader";
-import { loadProbeCache, probeFromClient, saveProbeCache } from "../lib/probe";
+import {
+  CLIENT_PROBE_INTERVAL_MS,
+  SERVER_STATUS_INTERVAL_MS,
+  loadProbeCache,
+  probeFromClient,
+  pruneProbeCache,
+  saveProbeCache,
+} from "../lib/probe";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
 import { DateTimeWidget } from "../components/DateTimeWidget";
@@ -91,7 +98,8 @@ export function PanelPage() {
   /**
    * 客户端存活探测（2026-08-22）：刷新页面/回到面板时由浏览器直连目标 URL
    * （HEAD no-cors），自动使用系统/浏览器代理；结果优先于服务端探测展示。
-   * 仅登录用户执行（访客视图不暴露私密 URL）；30s 节流避免频繁切窗口打爆目标。
+   * 仅登录用户执行（访客视图不暴露私密 URL）；仅探测已启用健康检查的链接；
+   * 30s 节流避免频繁切窗口打爆目标；面板打开期间按 120s 周期常驻探测。
    */
   const lastClientProbe = useRef(0);
   const runClientProbe = useCallback(() => {
@@ -103,6 +111,7 @@ export function PanelPage() {
     if (!panelData) return;
     const targets: { id: number; url: string }[] = [];
     const collect = (link: LinkOut) => {
+      if (!link.health_enabled) return;
       const url = link.url || link.url_lan || link.url_wan;
       if (url && /^https?:\/\//.test(url)) targets.push({ id: link.id, url });
     };
@@ -170,7 +179,23 @@ export function PanelPage() {
         // 访客公开状态页：首次进入立即检测
         loadHealth(true);
       });
-    panelApi.get().then(setPanel).catch(() => setPanel(null));
+    panelApi
+      .get()
+      .then((data) => {
+        setPanel(data);
+        // 清理已删除/停用健康检查链接的本地缓存残留
+        const active = new Set<number>();
+        const collectId = (link: LinkOut) => {
+          const url = link.url || link.url_lan || link.url_wan;
+          if (link.health_enabled && url && /^https?:\/\//.test(url)) {
+            active.add(link.id);
+          }
+        };
+        data.groups.forEach((group) => group.links.forEach(collectId));
+        data.ungrouped.forEach(collectId);
+        pruneProbeCache(active);
+      })
+      .catch(() => setPanel(null));
   }, [loadHealth]);
 
   // 刷新/首次进入：panel 与登录态均就绪后立即客户端探测存活率
@@ -198,6 +223,20 @@ export function PanelPage() {
       window.removeEventListener("focus", onFocus);
     };
   }, [loadHealth, runClientProbe]);
+
+  // 面板打开期间常驻探测：客户端 120s 周期直连更新（受 30s 节流约束），
+  // 服务端每 5min 走缓存兜底刷新（不强制出站），不依赖切窗口也能持续更新状态
+  useEffect(() => {
+    const probeTimer = window.setInterval(runClientProbe, CLIENT_PROBE_INTERVAL_MS);
+    const statusTimer = window.setInterval(
+      () => loadHealth(false),
+      SERVER_STATUS_INTERVAL_MS,
+    );
+    return () => {
+      window.clearInterval(probeTimer);
+      window.clearInterval(statusTimer);
+    };
+  }, [runClientProbe, loadHealth]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

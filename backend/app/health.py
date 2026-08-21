@@ -3,6 +3,7 @@
 - HEAD 优先，405/501 回退 GET（流式读完即弃）
 - 任何 HTTP 响应（<500）视为 up；≥500 或网络/超时视为 down
 - 缓存按 link_id 60s，避免面板轮询重复出站
+- 共享 httpx.Client（keep-alive 连接复用），避免每次检查新建客户端
 """
 from __future__ import annotations
 
@@ -19,24 +20,27 @@ _semaphore = threading.BoundedSemaphore(MAX_CONCURRENCY)
 _cache: dict[int, tuple[float, str, int]] = {}
 _cache_lock = threading.Lock()
 
+# 共享客户端：连接池复用，多线程下由 httpx 内部加锁保证安全
+_client = httpx.Client(
+    follow_redirects=True,
+    headers={"User-Agent": "LiPanel/1.0"},
+    timeout=CHECK_TIMEOUT,
+)
+
 
 def _check_once(url: str, timeout: float = CHECK_TIMEOUT) -> tuple[str, int]:
     start = time.monotonic()
     try:
-        with httpx.Client(
-            timeout=timeout, follow_redirects=True,
-            headers={"User-Agent": "LiPanel/1.0"},
-        ) as client:
-            try:
-                resp = client.head(url)
-            except httpx.HTTPError:
-                with client.stream("GET", url) as resp:
-                    status = resp.status_code
-            else:
+        try:
+            resp = _client.head(url, timeout=timeout)
+        except httpx.HTTPError:
+            with _client.stream("GET", url, timeout=timeout) as resp:
                 status = resp.status_code
-                if status in {405, 501}:
-                    with client.stream("GET", url) as resp:
-                        status = resp.status_code
+        else:
+            status = resp.status_code
+            if status in {405, 501}:
+                with _client.stream("GET", url, timeout=timeout) as resp:
+                    status = resp.status_code
     except httpx.HTTPError:
         return "down", 0
     ms = int((time.monotonic() - start) * 1000)

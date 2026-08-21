@@ -4,6 +4,7 @@ import {
   CLIENT_PROBE_TIMEOUT,
   loadProbeCache,
   probeFromClient,
+  pruneProbeCache,
   saveProbeCache,
 } from "./probe";
 
@@ -86,6 +87,45 @@ describe("probe cache", () => {
 
   it("损坏数据安全返回空对象", () => {
     localStorage.setItem("lipanel-health-cache-v1", "not-json");
+    expect(loadProbeCache()).toEqual({});
+  });
+});
+
+describe("pruneProbeCache", () => {
+  it("删除已停用/删除链接的残留结果，保留活跃结果", () => {
+    localStorage.clear();
+    saveProbeCache({
+      1: { status: "up", ms: 120 },
+      2: { status: "down", ms: null },
+      3: { status: "up", ms: 80 },
+    });
+    pruneProbeCache(new Set([1, 3]));
+    const cache = loadProbeCache();
+    expect(Object.keys(cache).sort()).toEqual(["1", "3"]);
+    expect(cache[1]).toEqual({ status: "up", ms: 120 });
+    expect(cache[3]).toEqual({ status: "up", ms: 80 });
+  });
+
+  it("清理时同时丢弃过期条目", () => {
+    localStorage.clear();
+    saveProbeCache({ 1: { status: "up", ms: 100 }, 2: { status: "down", ms: null } });
+    const raw = JSON.parse(localStorage.getItem("lipanel-health-cache-v1") ?? "{}");
+    raw["1"].ts = Date.now() - 11 * 60_000;
+    localStorage.setItem("lipanel-health-cache-v1", JSON.stringify(raw));
+    pruneProbeCache(new Set([1, 2]));
+    const cache = loadProbeCache();
+    expect(cache[1]).toBeUndefined();
+    expect(cache[2]).toBeDefined();
+  });
+
+  it("空活跃集合清空缓存，损坏数据安全跳过", () => {
+    localStorage.clear();
+    saveProbeCache({ 1: { status: "up", ms: 10 } });
+    pruneProbeCache(new Set());
+    expect(loadProbeCache()).toEqual({});
+
+    localStorage.setItem("lipanel-health-cache-v1", "not-json");
+    pruneProbeCache(new Set([1]));
     expect(loadProbeCache()).toEqual({});
   });
 });

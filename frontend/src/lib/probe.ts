@@ -7,6 +7,10 @@
  * - 全部目标并发发起（浏览器连接池自然排队，总耗时 ≈ 最慢单个，而非批次总和）
  * - onResult 逐条回调，首个快链接约 100ms 即可点亮状态点，不必等全部完成
  * - localStorage 缓存上次结果，刷新/重开页面立即渲染（探测完成后后台更新）
+ *
+ * 流程优化（2026-08-22）：
+ * - pruneProbeCache 清理已删除/停用链接的残留结果，缓存不再无限膨胀
+ * - 面板打开期间按 CLIENT_PROBE_INTERVAL_MS 常驻周期探测，不依赖切窗口
  */
 
 export interface ProbeTarget {
@@ -28,6 +32,10 @@ export interface ProbeCacheValue extends ProbeResult {
 export const CLIENT_PROBE_TIMEOUT = 5000;
 /** 缓存有效期：超过后不用于占位渲染 */
 export const PROBE_CACHE_TTL = 10 * 60_000;
+/** 面板打开期间的客户端常驻探测周期（受 30s 节流约束，实际间隔 ≥ 120s） */
+export const CLIENT_PROBE_INTERVAL_MS = 120_000;
+/** 面板打开期间服务端状态兜底刷新周期（非强制，命中服务端 60s 缓存） */
+export const SERVER_STATUS_INTERVAL_MS = 5 * 60_000;
 const PROBE_CACHE_KEY = "lipanel-health-cache-v1";
 
 export async function probeFromClient(
@@ -106,6 +114,34 @@ export function saveProbeCache(map: Record<number, ProbeResult>): void {
       payload[key] = { ...value, ts: now };
     }
     window.localStorage.setItem(PROBE_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    /* 隐私模式/存储不可用时静默降级 */
+  }
+}
+
+/** 清理本地缓存中已删除/停用链接的残留结果（保留有效且活跃的结果） */
+export function pruneProbeCache(activeIds: ReadonlySet<number>): void {
+  try {
+    const raw = window.localStorage.getItem(PROBE_CACHE_KEY);
+    if (!raw) return;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return;
+    const now = Date.now();
+    const next: Record<string, ProbeCacheValue> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      const id = Number(key);
+      const entry = value as Partial<ProbeCacheValue> | undefined;
+      if (
+        activeIds.has(id) &&
+        entry &&
+        (entry.status === "up" || entry.status === "down") &&
+        typeof entry.ts === "number" &&
+        now - entry.ts <= PROBE_CACHE_TTL
+      ) {
+        next[key] = { status: entry.status, ms: entry.ms ?? null, ts: entry.ts };
+      }
+    }
+    window.localStorage.setItem(PROBE_CACHE_KEY, JSON.stringify(next));
   } catch {
     /* 隐私模式/存储不可用时静默降级 */
   }
