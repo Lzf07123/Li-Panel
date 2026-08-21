@@ -6,7 +6,7 @@ import type { LinkOut, MeOut, PanelOut } from "../api/types";
 import { clearRecent, getRecent, recordRecent, type RecentItem } from "../lib/recent";
 import { loadCollapsedGroups, toggleCollapsedGroup } from "../lib/collapse";
 import { AppHeader } from "../components/AppHeader";
-import { probeFromClient, type ProbeResult } from "../lib/probe";
+import { loadProbeCache, probeFromClient, saveProbeCache } from "../lib/probe";
 import { Brand } from "../components/Brand";
 import { CommandPalette } from "../components/CommandPalette";
 import { DateTimeWidget } from "../components/DateTimeWidget";
@@ -62,7 +62,18 @@ export function PanelPage() {
   );
   const [linkHealth, setLinkHealth] = useState<
     Record<number, { status: "up" | "down" | "unknown"; ms: number | null }>
-  >({});
+  >(() => {
+    // 首次渲染直接使用本地缓存的上次探测结果（0ms 占位），避免等探测完成才显示
+    const cached = loadProbeCache();
+    const initial: Record<
+      number,
+      { status: "up" | "down" | "unknown"; ms: number | null }
+    > = {};
+    for (const [id, value] of Object.entries(cached)) {
+      initial[Number(id)] = { status: value.status, ms: value.ms };
+    }
+    return initial;
+  });
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const toast = useToast();
@@ -98,14 +109,11 @@ export function PanelPage() {
     for (const group of panelData.groups) group.links.forEach(collect);
     panelData.ungrouped.forEach(collect);
     if (targets.length === 0) return;
-    void probeFromClient(targets)
-      .then((map) => {
-        const next: Record<number, ProbeResult> = {};
-        for (const [id, value] of Object.entries(map)) {
-          next[Number(id)] = value;
-        }
-        setLinkHealth((prev) => ({ ...prev, ...next }));
-      })
+    void probeFromClient(targets, fetch, 5000, (id, value) => {
+      // 流式更新：每个目标完成立即点亮状态点，首个快链接约 100ms 出现
+      setLinkHealth((prev) => ({ ...prev, [id]: value }));
+    })
+      .then((map) => saveProbeCache(map))
       .catch(() => undefined);
   }, []);
 
