@@ -51,6 +51,9 @@ def _clear_health_state():
         health_module._cache.clear()
     with health_router._inflight_lock:
         health_router._inflight.clear()
+    with health_router._refresh_lock:
+        # 30s 强制刷新节流为模块级状态：跨用例清除，避免前序用例污染后续用例
+        health_router._refresh_last.clear()
     yield
 
 

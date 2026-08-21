@@ -200,8 +200,8 @@ describe("collectProbeTargets", () => {
   });
 });
 
-describe("probeFromClient 分批探测", () => {
-  it("批内并发上限为批大小，批间串行（下一批等上一批全部完成）", async () => {
+describe("probeFromClient 分批显示", () => {
+  it("探测全并发发起（活跃数 = 目标数），不再串行分批", async () => {
     let active = 0;
     let maxActive = 0;
     mockFetch(() => {
@@ -219,14 +219,13 @@ describe("probeFromClient 分批探测", () => {
       url: `https://x${i}.example`,
     }));
     const result = await probeFromClient(targets, fetch, 5000);
-    // 7 个目标分 2 批：第 1 批 6 个并发，第 2 批 1 个，活跃数永不越过批大小
     expect(CLIENT_PROBE_BATCH_SIZE).toBeGreaterThan(0);
-    expect(maxActive).toBeLessThanOrEqual(CLIENT_PROBE_BATCH_SIZE);
-    expect(maxActive).toBe(CLIENT_PROBE_BATCH_SIZE);
+    // 7 个目标同时发起：总耗时 ≈ 最慢单个，而不是「批数 × 最慢单批」
+    expect(maxActive).toBe(7);
     expect(Object.keys(result)).toHaveLength(7);
   });
 
-  it("每批完成后按批回调 onBatch 与进度", async () => {
+  it("每凑满一批按完成计数回调 onBatch 与进度（显示分批，探测不等待）", async () => {
     mockFetch((_url) => {
       const id = Number(new URL(_url).hostname.replace("x", ""));
       return new Promise((resolve) =>
@@ -237,15 +236,18 @@ describe("probeFromClient 分批探测", () => {
       id: i,
       url: `https://x${i}.example`,
     }));
-    const batches: { done: number; total: number; ids: number[] }[] = [];
+    const progressSeq: { done: number; total: number }[] = [];
+    const batchSizes: number[] = [];
     const result = await probeFromClient(targets, fetch, 5000, undefined, (batch, progress) => {
-      batches.push({ done: progress.done, total: progress.total, ids: Object.keys(batch).map(Number) });
+      progressSeq.push({ done: progress.done, total: progress.total });
+      batchSizes.push(Object.keys(batch).length);
     });
-    expect(batches).toEqual([
-      { done: 1, total: 2, ids: [0, 1, 2, 3, 4, 5] },
-      { done: 2, total: 2, ids: [6] },
+    // 7 个结果按完成顺序凑批：前 6 个一批、剩余 1 个一批
+    expect(progressSeq).toEqual([
+      { done: 1, total: 2 },
+      { done: 2, total: 2 },
     ]);
-    expect(result[6]).toEqual({ status: "up", ms: expect.any(Number) });
+    expect(batchSizes).toEqual([6, 1]);
     expect(Object.keys(result)).toHaveLength(7);
   });
 
