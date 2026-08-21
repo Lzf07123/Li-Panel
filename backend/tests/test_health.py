@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -42,12 +43,23 @@ def health_server():
 
 
 @pytest.fixture(autouse=True)
-def _clear_health_cache():
+def _clear_health_state():
     from app import health as health_module
+    from app.routers import health as health_router
 
     with health_module._cache_lock:
         health_module._cache.clear()
+    with health_router._inflight_lock:
+        health_router._inflight.clear()
     yield
+
+
+def _wait_for_posts(count: int, timeout: float = 3.0) -> int:
+    """等待异步通知送达（通知改后台线程发送后，需轮询断言）。"""
+    deadline = time.monotonic() + timeout
+    while len(_NotifyHandler.posts) < count and time.monotonic() < deadline:
+        time.sleep(0.01)
+    return len(_NotifyHandler.posts)
 
 
 def test_health_links_up(client, auth_headers, health_server):
@@ -76,9 +88,11 @@ def test_health_links_down(client, auth_headers, health_server):
 
 
 def test_health_cache_avoids_refetch(client, auth_headers, health_server):
+    # icon_type=iconify 避免建链接触发后台 favicon 抓取打到同一测试服务器，
+    # 否则其 GET /favicon.ico 会污染请求计数（与健康检查缓存无关的时序竞态）
     client.post(
         "/api/links",
-        json={"name": "A", "url_lan": health_server},
+        json={"name": "A", "url_lan": health_server, "icon_type": "iconify", "icon_value": "mdi:test"},
         headers=auth_headers,
     )
     client.get("/api/health/links", headers=auth_headers)
@@ -313,7 +327,7 @@ def test_notify_on_status_change(client, auth_headers, health_server, notify_ser
         headers=auth_headers,
     ).json()["id"]
     client.get("/api/health/links", headers=auth_headers)
-    assert len(_NotifyHandler.posts) == 1  # 首次采样视为状态变化
+    assert _wait_for_posts(1) == 1  # 首次采样视为状态变化
 
     def _reset_history(status):
         conn = connect(client.app.state.db_path)
@@ -331,6 +345,7 @@ def test_notify_on_status_change(client, auth_headers, health_server, notify_ser
     with health_module._cache_lock:
         health_module._cache.clear()
     client.get("/api/health/links", headers=auth_headers)
+    time.sleep(0.1)  # 给异步通知留出到达窗口，确认没有多余通知
     assert len(_NotifyHandler.posts) == 1
 
     # 状态变化 → 通知
@@ -339,7 +354,7 @@ def test_notify_on_status_change(client, auth_headers, health_server, notify_ser
     with health_module._cache_lock:
         health_module._cache.clear()
     client.get("/api/health/links", headers=auth_headers)
-    assert len(_NotifyHandler.posts) == 2
+    assert _wait_for_posts(2) == 2
     assert _NotifyHandler.posts[-1]["status"] == "down"
     assert _NotifyHandler.posts[-1]["previous_status"] == "up"
 
@@ -352,6 +367,7 @@ def test_notify_disabled(client, auth_headers, health_server, notify_server):
         headers=auth_headers,
     )
     client.get("/api/health/links", headers=auth_headers)
+    time.sleep(0.1)  # 给异步通知留出到达窗口，确认没有通知发出
     assert _NotifyHandler.posts == []
 
 
@@ -560,3 +576,55 @@ def test_health_links_refresh_throttled(client, auth_headers, monkeypatch):
     assert r2.status_code == 200
     assert len(calls) == 1, "第二次 refresh=1 不应再强制检测"
     assert r2.json()["results"][0]["link_id"] == lid
+
+
+def test_single_flight_coalesces_concurrent_checks(monkeypatch):
+    """同一链接的并发探测合并为一次出站（多标签页/并行请求共享结果）。"""
+    from app.routers import health as health_router
+
+    calls: dict[str, int] = {}
+    barrier = threading.Barrier(2)
+
+    def fake_check(url, timeout=5.0):
+        calls[url] = calls.get(url, 0) + 1
+        time.sleep(0.2)
+        return "up", 10
+
+    monkeypatch.setattr(health_router, "check_url", fake_check)
+
+    link = {
+        "id": 4242,
+        "url_lan": "https://example.com/single-flight",
+        "url_wan": None,
+        "health_timeout": 5.0,
+    }
+    outcomes: list[list] = []
+
+    def worker():
+        barrier.wait()
+        outcomes.append(health_router._check_many([link], refresh=True))
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(calls) == 1, "并发探测同一链接只应出站一次"
+    assert len(outcomes) == 2
+    assert all(r[0]["status"] == "up" for r in outcomes)
+
+
+def test_health_db_failure_503(client, monkeypatch):
+    """/api/health 在数据库不可用时返回 503，让容器 healthcheck 感知。"""
+    import sqlite3
+
+    import app.main as main_module
+
+    def boom(*args, **kwargs):
+        raise sqlite3.OperationalError("db gone")
+
+    monkeypatch.setattr(main_module, "connect", boom)
+    r = client.get("/api/health")
+    assert r.status_code == 503
+    assert r.json()["status"] == "error"

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import csv
+import io
 import sqlite3
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-
-import csv
-import io
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -15,18 +14,23 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from app.brand_defaults import get_site_settings
 from app.db import get_db
 from app.deps import current_user
-from app.health import check_url, get_cached, set_cached
+from app.health import MAX_CONCURRENCY, check_url, get_cached, set_cached
 from app.notify import send_notification
 
 router = APIRouter(prefix="/api/health", tags=["health"])
 
-MAX_WORKERS = 4
 SAMPLE_INTERVAL_MINUTES = 10
 HISTORY_HOURS = 24
 MAX_HISTORY_ROWS = 144
 # 强制检测节流窗口：refresh=true 每用户/IP 30s 内最多执行一次，
 # 防止多标签页/多设备反复强制出站检测拖垮面板（前端另有 60s 节流兜底）。
 FORCE_REFRESH_WINDOW = 30.0
+
+# 探测执行器：模块级复用，避免每个请求新建线程池；
+# 配合 single-flight（_inflight）实现全局并发 ≤MAX_CONCURRENCY 且同链接只出站一次。
+_executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENCY)
+_inflight: dict[int, Future] = {}
+_inflight_lock = threading.Lock()
 
 LINK_COLS = (
     "id, name, url_lan, url_wan, health_enabled, health_interval, "
@@ -57,15 +61,52 @@ def _allow_force_refresh(key: str, window: float = FORCE_REFRESH_WINDOW) -> bool
         return True
 
 
+def _submit_or_join(link: sqlite3.Row) -> Future:
+    """提交探测任务；同链接已有在途任务则直接复用（single-flight 合并）。
+
+    多标签页/并行请求对同一链接只产生一次出站探测，结果共享。
+    """
+    link_id = link["id"]
+    created = False
+    with _inflight_lock:
+        future = _inflight.get(link_id)
+        if future is None:
+            future = _executor.submit(
+                check_url, _effective_url(link), link["health_timeout"]
+            )
+            _inflight[link_id] = future
+            created = True
+    if created:
+        # 回调注册必须在锁外：任务完成过快时 add_done_callback 会同步触发，
+        # 若仍持锁会造成不可重入锁自锁（future.result 永不返回）。
+        def _done(fut: Future, lid: int = link_id) -> None:
+            with _inflight_lock:
+                # 身份校验：只清理自己登记的任务，避免误删新任务
+                if _inflight.get(lid) is fut:
+                    _inflight.pop(lid, None)
+
+        future.add_done_callback(_done)
+    return future
+
+
+def _await_result(future: Future) -> tuple[str, int]:
+    try:
+        return future.result()
+    except Exception:
+        # 探测任务异常兜底（check_url 本身不抛，防御外部注入/未来改动）
+        return "down", 0
+
+
 def _check_many(
     links: list[sqlite3.Row], refresh: bool = False
 ) -> list[dict]:
     """并发 ≤4 检查链接列表（按链接自身超时），返回按 link_id 排序的结果。
 
-    refresh=True 时忽略内存缓存（用户侧「回到面板」强制重新检测）。
+    refresh=True 时忽略内存缓存（用户侧「回到面板」强制重新检测）；
+    同链接在途探测自动合并（single-flight），不会重复出站。
     """
     results: list[dict] = []
-    pending: dict = {}
+    pending: list[tuple[int, Future]] = []
     for link in links:
         cached = None if refresh else get_cached(link["id"])
         if cached is not None:
@@ -79,28 +120,27 @@ def _check_many(
                 }
             )
         else:
-            pending[link["id"]] = link
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futures = {
-            pool.submit(
-                check_url, _effective_url(link), link["health_timeout"]
-            ): link_id
-            for link_id, link in pending.items()
-        }
-        for future in as_completed(futures):
-            link_id = futures[future]
-            status, ms = future.result()
-            set_cached(link_id, status, ms)
-            results.append(
-                {
-                    "link_id": link_id,
-                    "status": status,
-                    "ms": ms,
-                    "checked_at": _now_utc().isoformat(),
-                }
-            )
+            pending.append((link["id"], _submit_or_join(link)))
+    for link_id, future in pending:
+        status, ms = _await_result(future)
+        set_cached(link_id, status, ms)
+        results.append(
+            {
+                "link_id": link_id,
+                "status": status,
+                "ms": ms,
+                "checked_at": _now_utc().isoformat(),
+            }
+        )
     results.sort(key=lambda item: item["link_id"])
     return results
+
+
+def _notify_async(url: str, payload: dict) -> None:
+    """通知后台线程发送：批量状态变化不串行阻塞面板响应（单条 5s 超时）。"""
+    threading.Thread(
+        target=send_notification, args=(url, payload), daemon=True
+    ).start()
 
 
 @router.get("/links")
@@ -211,7 +251,7 @@ def _record_samples(
             (link_id, user_id, effective, item["ms"], fail_count, fmt),
         )
         if notify_enabled and notify_url and prev_status != effective:
-            send_notification(
+            _notify_async(
                 notify_url,
                 {
                     "event": "link_status_changed",

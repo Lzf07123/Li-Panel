@@ -165,8 +165,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     @app.get("/api/health")
-    def health() -> dict:
-        return {"status": "ok", "version": VERSION}
+    def health() -> JSONResponse:
+        """存活/就绪检查：进程活着且 SQLite 可读（Docker HEALTHCHECK 依赖）。
+
+        DB 打开或查询失败返回 503，让 healthcheck 在数据库损坏/数据目录
+        不可用时立即把容器标记为 unhealthy，而不是只报进程存活。
+        """
+        try:
+            conn = connect(app.state.db_path)
+            try:
+                conn.execute("SELECT 1").fetchone()
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            return JSONResponse(
+                {"status": "error", "version": VERSION}, status_code=503
+            )
+        return JSONResponse({"status": "ok", "version": VERSION})
 
     app.include_router(setup.router)
     app.include_router(auth.router)
