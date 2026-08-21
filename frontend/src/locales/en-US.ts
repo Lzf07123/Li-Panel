@@ -118,6 +118,11 @@ export const enUS: Record<string, string> = {
   "状态趋势": "Status trend",
   "最近 24 小时采样（每 10 分钟一轮）· 当前共 {n} 条": "Last 24h samples (every 10 min) · {n} entries",
   "还没有历史数据，状态检查后会自动采样。": "No history yet; it will be sampled after checks.",
+  "重新检测": "Re-check",
+  "重新检测所有快捷方式的存活状态": "Re-check the liveness of all shortcuts",
+  "检测中…": "Checking…",
+  "存活检测完成": "Liveness check complete",
+  "没有启用健康检查的快捷方式": "No shortcuts have health check enabled",
   // 设置
   "站点信息": "Site",
   "标签管理": "Tags",

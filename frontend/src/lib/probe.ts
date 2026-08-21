@@ -13,9 +13,24 @@
  * - 面板打开期间按 CLIENT_PROBE_INTERVAL_MS 常驻周期探测，不依赖切窗口
  */
 
+import type { LinkOut } from "../api/types";
+
 export interface ProbeTarget {
   id: number;
   url: string;
+}
+
+/** 收集需要客户端探测的链接：仅启用健康检查且带 http(s) 地址（访客不暴露私密 URL）。 */
+export function collectProbeTargets(links: LinkOut[]): ProbeTarget[] {
+  const targets: ProbeTarget[] = [];
+  for (const link of links) {
+    if (!link.health_enabled) continue;
+    const url = link.url || link.url_lan || link.url_wan;
+    if (url && /^https?:\/\//.test(url)) {
+      targets.push({ id: link.id, url });
+    }
+  }
+  return targets;
 }
 
 export interface ProbeResult {

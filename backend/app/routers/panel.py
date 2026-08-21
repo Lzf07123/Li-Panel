@@ -51,6 +51,10 @@ def _full_link_dict(link: sqlite3.Row, mode: str) -> dict:
         "guest_url_mode": link["guest_url_mode"],
         "sort_order": link["sort_order"],
         "open_mode": link["open_mode"],
+        "health_enabled": bool(link["health_enabled"]),
+        "health_interval": link["health_interval"],
+        "health_timeout": link["health_timeout"],
+        "health_threshold": link["health_threshold"],
     }
     return data
 
