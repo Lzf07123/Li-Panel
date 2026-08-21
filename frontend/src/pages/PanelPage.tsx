@@ -10,6 +10,7 @@ import { AppHeader } from "../components/AppHeader";
 import {
   CLIENT_PROBE_INTERVAL_MS,
   SERVER_STATUS_INTERVAL_MS,
+  collectProbeTargets,
   loadProbeCache,
   probeFromClient,
   pruneProbeCache,
@@ -73,6 +74,8 @@ export function PanelPage() {
   });
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
+  /** 手动「重新检测」进行中：按钮禁用并显示进度 */
+  const [probing, setProbing] = useState(false);
   const toast = useToast();
   const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -92,28 +95,30 @@ export function PanelPage() {
    * 30s 节流避免频繁切窗口打爆目标；面板打开期间按 120s 周期常驻探测。
    */
   const lastClientProbe = useRef(0);
-  const runClientProbe = useCallback(() => {
-    if (!meRef.current) return;
+  /** force=true 由手动按钮触发：绕过 30s 节流立即探测；返回是否实际发起过客户端探测 */
+  const runClientProbe = useCallback((force = false): Promise<boolean> => {
+    if (!meRef.current) return Promise.resolve(false);
     const now = Date.now();
-    if (now - lastClientProbe.current < 30_000) return;
+    if (!force && now - lastClientProbe.current < 30_000) {
+      return Promise.resolve(false);
+    }
     lastClientProbe.current = now;
     const panelData = panelRef.current;
-    if (!panelData) return;
-    const targets: { id: number; url: string }[] = [];
-    const collect = (link: LinkOut) => {
-      if (!link.health_enabled) return;
-      const url = link.url || link.url_lan || link.url_wan;
-      if (url && /^https?:\/\//.test(url)) targets.push({ id: link.id, url });
-    };
-    for (const group of panelData.groups) group.links.forEach(collect);
-    panelData.ungrouped.forEach(collect);
-    if (targets.length === 0) return;
-    void probeFromClient(targets, fetch, 5000, (id, value) => {
+    if (!panelData) return Promise.resolve(false);
+    const targets = collectProbeTargets([
+      ...panelData.groups.flatMap((group) => group.links),
+      ...panelData.ungrouped,
+    ]);
+    if (targets.length === 0) return Promise.resolve(false);
+    return probeFromClient(targets, fetch, 5000, (id, value) => {
       // 流式更新：每个目标完成立即点亮状态点，首个快链接约 100ms 出现
       setLinkHealth((prev) => ({ ...prev, [id]: value }));
     })
-      .then((map) => saveProbeCache(map))
-      .catch(() => undefined);
+      .then((map) => {
+        saveProbeCache(map);
+        return true;
+      })
+      .catch(() => false);
   }, []);
 
   /** 站点连接检测由用户侧发起：refresh=true 强制重新检测（忽略服务端缓存）。
@@ -122,33 +127,37 @@ export function PanelPage() {
       若每次都强制出站检测，慢链接多时会拖垮面板（状态点转圈/失败）。
       60s 内重复触发降级为普通请求，直接命中服务端缓存。 */
   const lastForcedHealth = useRef(0);
-  const loadHealth = useCallback((refresh: boolean) => {
-    const now = Date.now();
-    if (refresh) {
-      if (now - lastForcedHealth.current < 60_000) {
-        refresh = false;
-      } else {
-        lastForcedHealth.current = now;
+  /** manual=true 由手动按钮触发：绕过前端 60s 节流直接 refresh=1（后端仍有 30s 兜底） */
+  const loadHealth = useCallback(
+    (refresh: boolean, manual = false): Promise<void> => {
+      const now = Date.now();
+      if (refresh) {
+        if (!manual && now - lastForcedHealth.current < 60_000) {
+          refresh = false;
+        } else {
+          lastForcedHealth.current = now;
+        }
       }
-    }
-    const target = meRef.current
-      ? healthApi.links(refresh)
-      : healthApi.status(refresh);
-    void target
-      .then((data) => {
-        setLinkHealth((prev) => {
-          const next = { ...prev };
-          for (const item of data.results) {
-            // 客户端探测结果优先；服务端仅补齐未探测的链接（访客/无 URL 链接）
-            if (!(item.link_id in next)) {
-              next[item.link_id] = { status: item.status, ms: item.ms };
+      const target = meRef.current
+        ? healthApi.links(refresh)
+        : healthApi.status(refresh);
+      return target
+        .then((data) => {
+          setLinkHealth((prev) => {
+            const next = { ...prev };
+            for (const item of data.results) {
+              // 客户端探测结果优先；服务端仅补齐未探测的链接（访客/无 URL 链接）
+              if (!(item.link_id in next)) {
+                next[item.link_id] = { status: item.status, ms: item.ms };
+              }
             }
-          }
-          return next;
-        });
-      })
-      .catch(() => undefined);
-  }, []);
+            return next;
+          });
+        })
+        .catch(() => undefined);
+    },
+    [],
+  );
 
   useEffect(() => {
     authApi
@@ -174,15 +183,12 @@ export function PanelPage() {
       .then((data) => {
         setPanel(data);
         // 清理已删除/停用健康检查链接的本地缓存残留
-        const active = new Set<number>();
-        const collectId = (link: LinkOut) => {
-          const url = link.url || link.url_lan || link.url_wan;
-          if (link.health_enabled && url && /^https?:\/\//.test(url)) {
-            active.add(link.id);
-          }
-        };
-        data.groups.forEach((group) => group.links.forEach(collectId));
-        data.ungrouped.forEach(collectId);
+        const active = new Set(
+          collectProbeTargets([
+            ...data.groups.flatMap((group) => group.links),
+            ...data.ungrouped,
+          ]).map((target) => target.id),
+        );
         pruneProbeCache(active);
       })
       .catch(() => setPanel(null));
@@ -433,6 +439,23 @@ export function PanelPage() {
     window.location.href = "/";
   };
 
+  /** 手动触发存活探测：客户端直连 + 服务端强制刷新（均绕过前端节流，后端 30s 兜底） */
+  const handleManualProbe = useCallback(async () => {
+    if (probing) return;
+    setProbing(true);
+    try {
+      const ranClient = await runClientProbe(true);
+      await loadHealth(true, true);
+      if (meRef.current && !ranClient) {
+        toast.info(t("没有启用健康检查的快捷方式"));
+      } else {
+        toast.success(t("存活检测完成"));
+      }
+    } finally {
+      setProbing(false);
+    }
+  }, [probing, runClientProbe, loadHealth, toast, t]);
+
   if (!panel) {
     return <PageSkeleton title="快捷方式" />;
   }
@@ -446,24 +469,55 @@ export function PanelPage() {
         <AppHeader
           title={me ? t("欢迎，{name}", { name: me.user.username }) : t("快捷方式")}
           actions={
-            me ? (
-              <>
-                <Link to="/settings" className="btn btn-ghost h-9 px-3">
-                  {t("管理")}
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost h-9 px-3"
+                onClick={() => void handleManualProbe()}
+                disabled={probing}
+                aria-label={t("重新检测")}
+                title={t("重新检测所有快捷方式的存活状态")}
+              >
+                {probing ? (
+                  <span aria-hidden="true" className="spinner" />
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                  >
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                    <path d="M21 3v6h-6" />
+                  </svg>
+                )}
+                <span className="hidden sm:inline">
+                  {probing ? t("检测中…") : t("重新检测")}
+                </span>
+              </button>
+              {me ? (
+                <>
+                  <Link to="/settings" className="btn btn-ghost h-9 px-3">
+                    {t("管理")}
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn btn-ghost h-9 px-3"
+                    onClick={logout}
+                  >
+                    {t("退出")}
+                  </button>
+                </>
+              ) : (
+                <Link to="/login" className="btn btn-primary h-9 px-4">
+                  {t("登录")}
                 </Link>
-                <button
-                  type="button"
-                  className="btn btn-ghost h-9 px-3"
-                  onClick={logout}
-                >
-                  {t("退出")}
-                </button>
-              </>
-            ) : (
-              <Link to="/login" className="btn btn-primary h-9 px-4">
-                {t("登录")}
-              </Link>
-            )
+              )}
+            </>
           }
         />
         <main

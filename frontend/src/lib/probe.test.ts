@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { LinkOut } from "../api/types";
+
 import {
   CLIENT_PROBE_TIMEOUT,
+  collectProbeTargets,
   loadProbeCache,
   probeFromClient,
   pruneProbeCache,
@@ -127,5 +130,71 @@ describe("pruneProbeCache", () => {
     localStorage.setItem("lipanel-health-cache-v1", "not-json");
     pruneProbeCache(new Set([1]));
     expect(loadProbeCache()).toEqual({});
+  });
+});
+
+describe("collectProbeTargets", () => {
+  const base: Omit<LinkOut, "id" | "health_enabled"> = {
+    group_id: null,
+    name: "",
+    url_lan: "",
+    url_wan: null,
+    icon_type: "letter",
+    icon_value: null,
+    description: "",
+    tags: [],
+    is_public: false,
+    guest_url_mode: "hidden",
+    sort_order: 0,
+    open_mode: "new_tab",
+    health_interval: 10,
+    health_timeout: 5,
+    health_threshold: 1,
+  };
+
+  it("仅收集启用健康检查且带 http(s) 地址的链接", () => {
+    const links: LinkOut[] = [
+      { ...base, id: 1, health_enabled: true, url: "https://a.example" },
+      { ...base, id: 2, health_enabled: false, url: "https://b.example" },
+      { ...base, id: 3, health_enabled: true, url_lan: "http://192.168.1.2" },
+      { ...base, id: 4, health_enabled: true, url_lan: "ftp://x.example" },
+    ];
+    expect(collectProbeTargets(links)).toEqual([
+      { id: 1, url: "https://a.example" },
+      { id: 3, url: "http://192.168.1.2" },
+    ]);
+  });
+
+  it("url 为空时回退 url_lan / url_wan", () => {
+    const links: LinkOut[] = [
+      {
+        ...base,
+        id: 1,
+        health_enabled: true,
+        url: undefined,
+        url_wan: "https://w.example",
+      },
+      {
+        ...base,
+        id: 2,
+        health_enabled: true,
+        url: undefined,
+        url_lan: "http://l.example",
+        url_wan: "https://w2.example",
+      },
+    ];
+    expect(collectProbeTargets(links)).toEqual([
+      { id: 1, url: "https://w.example" },
+      { id: 2, url: "http://l.example" },
+    ]);
+  });
+
+  it("空地址或非 http(s) 协议跳过", () => {
+    const links: LinkOut[] = [
+      { ...base, id: 1, health_enabled: true, url: "" },
+      { ...base, id: 2, health_enabled: true, url_lan: "mailto:a@example.com" },
+      { ...base, id: 3, health_enabled: false, url: "https://x.example" },
+    ];
+    expect(collectProbeTargets(links)).toEqual([]);
   });
 });
