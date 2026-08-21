@@ -2,6 +2,14 @@
 
 ## 0.1.0（2026-08-21）
 
+### 超长 URL 显示修复（2026-08-22）
+
+- **后台快捷方式表格**：URL 列在所有断点统一单行截断 + 省略号（原桌面端恢复自然换行，298 字符 URL 会把行撑高至 164px 且无省略号）；单元格增加 `title` 悬停查看全文；列宽统一由 `.table-cell-clip`（11rem）控制。
+- **命令面板**：列表项 label 优先完整显示（`flex-1 min-w-0`），hint 压缩至最多 45% 宽度并截断；hint 增加 `title` 悬停查看全文（原长描述/URL 会把名称挤压到只剩数像素）。
+- **内置窗口预览**：URL 行补充 `title` 悬停提示。
+- 验证：Playwright 实测超长 URL（298 字符）——表格单元格高度 164px→52px 且显示省略号、命令面板名称 23px→264px 完整、hint 截断；tsc/vite build/vitest 17 passed。
+
+
 ### 上线前全面审查修复（第二轮，2026-08-21）
 
 - **安全（P1）**：`PANEL_HOST_COOKIE=true` 时会话管理接口（列表/吊销单个/全量吊销）改从 `settings.session_cookie` 读取 Cookie，修复 `__Host-` 模式下 current 标记恒为 false、可误吊销当前会话的问题；新增 3 条回归测试。
