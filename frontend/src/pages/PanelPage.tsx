@@ -124,7 +124,7 @@ export function PanelPage() {
         setLinkHealth((prev) => ({ ...prev, [id]: value }));
       },
       (batchResults, progress) => {
-        // 分批显示：每批完成后整批刷新一次（与流式结果幂等）并更新进度；全部完成清空
+        // 分批显示：按完成计数每 6 个凑一批整批刷新（与流式结果幂等）并更新进度；全部完成清空
         setLinkHealth((prev) => ({ ...prev, ...batchResults }));
         setProbeProgress(progress.done < progress.total ? progress : null);
       },
@@ -454,13 +454,19 @@ export function PanelPage() {
     window.location.href = "/";
   };
 
-  /** 手动触发存活探测：客户端直连 + 服务端强制刷新（均绕过前端节流，后端 30s 兜底） */
+  /** 手动触发存活探测：客户端直连（全并发，≤5s）为主；服务端强制刷新后台进行，不阻塞按钮收尾 */
   const handleManualProbe = useCallback(async () => {
     if (probing) return;
     setProbing(true);
     try {
       const ranClient = await runClientProbe(true);
-      await loadHealth(true, true);
+      if (meRef.current) {
+        // 登录用户：客户端探测已实时点亮状态点，服务端仅维护历史/趋势/通知，后台刷新即可
+        void loadHealth(true, true);
+      } else {
+        // 访客：无客户端探测，服务端公开状态刷新是唯一来源，需等它完成
+        await loadHealth(true, true);
+      }
       if (meRef.current && !ranClient) {
         toast.info(t("没有启用健康检查的快捷方式"));
       } else {

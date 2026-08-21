@@ -51,7 +51,7 @@ export interface ProbeCacheValue extends ProbeResult {
 
 /** 单目标超时：与后端 FETCH_TIMEOUT 对齐 */
 export const CLIENT_PROBE_TIMEOUT = 5000;
-/** 探测批大小：每批并发发起、批间串行（避免一次打爆目标站点/浏览器连接池），每批完成后回调一次 */
+/** 显示批大小：探测全并发发起，仅按完成计数每 6 个凑一批回调（分批显示/进度） */
 export const CLIENT_PROBE_BATCH_SIZE = 6;
 /** 缓存有效期：超过后不用于占位渲染 */
 export const PROBE_CACHE_TTL = 10 * 60_000;
@@ -70,45 +70,55 @@ export async function probeFromClient(
 ): Promise<Record<number, ProbeResult>> {
   const results: Record<number, ProbeResult> = {};
   const total = Math.ceil(targets.length / CLIENT_PROBE_BATCH_SIZE);
-  // 分批检测：每批 CLIENT_PROBE_BATCH_SIZE 个并发发起，批间串行；
-  // 每批完成后回调 onBatch（分批显示/进度），批内 onResult 仍逐条流式点亮。
-  for (let i = 0; i < targets.length; i += CLIENT_PROBE_BATCH_SIZE) {
-    const batch = targets.slice(i, i + CLIENT_PROBE_BATCH_SIZE);
-    await Promise.all(
-      batch.map(async ({ id, url }) => {
-        const started = performance.now();
-        let result: ProbeResult;
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), timeout);
-          try {
-            // no-cors：跨域 HEAD 只能拿到 opaque 响应，但网络层可达即判定存活
-            await fetchImpl(url, {
-              method: "HEAD",
-              mode: "no-cors",
-              cache: "no-store",
-              signal: controller.signal,
-            });
-            result = {
-              status: "up",
-              ms: Math.round(performance.now() - started),
-            };
-          } finally {
-            clearTimeout(timer);
-          }
-        } catch {
-          result = { status: "down", ms: null };
-        }
-        results[id] = result;
-        onResult?.(id, result);
-      }),
-    );
-    const batchResults: Record<number, ProbeResult> = {};
-    for (const target of batch) {
-      batchResults[target.id] = results[target.id];
+  let completed = 0;
+  let batchResults: Record<number, ProbeResult> = {};
+
+  // 探测全并发发起：浏览器连接池自然排队，总耗时 ≈ 最慢单个（≤timeout），
+  // 不做串行分批（串行分批在链接多/站点慢时总耗时 = 批数 × 最慢单批）。
+  // 显示仍分批：每凑满 CLIENT_PROBE_BATCH_SIZE 个结果回调一次 onBatch（进度/整批刷新），
+  // 批内 onResult 仍逐条流式点亮。
+  const record = (id: number, result: ProbeResult) => {
+    results[id] = result;
+    onResult?.(id, result);
+    completed += 1;
+    batchResults[id] = result;
+    if (completed % CLIENT_PROBE_BATCH_SIZE === 0 || completed === targets.length) {
+      onBatch?.(batchResults, {
+        done: Math.ceil(completed / CLIENT_PROBE_BATCH_SIZE),
+        total,
+      });
+      batchResults = {};
     }
-    onBatch?.(batchResults, { done: i / CLIENT_PROBE_BATCH_SIZE + 1, total });
-  }
+  };
+
+  await Promise.all(
+    targets.map(async ({ id, url }) => {
+      const started = performance.now();
+      let result: ProbeResult;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
+        try {
+          // no-cors：跨域 HEAD 只能拿到 opaque 响应，但网络层可达即判定存活
+          await fetchImpl(url, {
+            method: "HEAD",
+            mode: "no-cors",
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          result = {
+            status: "up",
+            ms: Math.round(performance.now() - started),
+          };
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch {
+        result = { status: "down", ms: null };
+      }
+      record(id, result);
+    }),
+  );
   return results;
 }
 
